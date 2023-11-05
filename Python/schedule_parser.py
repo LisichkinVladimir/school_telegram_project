@@ -11,7 +11,7 @@ schedule_url = "https://1502.mskobr.ru/uchashimsya/raspisanie-kanikuly"
 
 class SchoolClass:
     """
-    Школьшый класс
+    Школьный класс
     """
     def __init__(self, name: str, link: str):
         self.__name: str = name
@@ -61,7 +61,7 @@ class Schedules:
 
     def parse(self, url: str) -> bool:
         # Получение html из Web
-        response = requests.get(url, verify=False)
+        response = requests.get(url)
         if response.status_code != 200:
             logging.error(f"Error get {schedule_url}. error code {response.status_code}")
             return False
