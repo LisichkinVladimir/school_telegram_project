@@ -6,9 +6,7 @@ import requests
 import sys
 import re
 from bs4 import BeautifulSoup
-
-schedule_url = "https://1502.mskobr.ru/uchashimsya/raspisanie-kanikuly"
-
+import config as cfg
 class SchoolClass:
     """
     Школьный класс
@@ -63,7 +61,7 @@ class Schedules:
         # Получение html из Web
         response = requests.get(url)
         if response.status_code != 200:
-            logging.error(f"Error get {schedule_url}. error code {response.status_code}")
+            logging.error(f"Error get {url}. error code {response.status_code}")
             return False
         data = response.text
         logging.info(f"get {data[:20]}...\n")
@@ -113,7 +111,7 @@ def main():
     """
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     schedules = Schedules()
-    schedules.parse(schedule_url)
+    schedules.parse(cfg.SCHEDULE_URL)
     print("----------------------------------------------")
     for schedule in schedules.list:
         print(schedule.department)
