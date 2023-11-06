@@ -14,6 +14,11 @@ class SchoolClass:
     Школьный класс
     """
     def __init__(self, name: str, link: str):
+        """
+        Конструктор класса
+        name: название класса
+        link: ссылка на pdf файл, содержащий расписание
+        """
         self.__name: str = name
         match = re.search(R"^\d{1,2}", name)
         self.__number: int = None
