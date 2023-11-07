@@ -3,7 +3,7 @@
 """
 import os
 
-BOT_TOKEN = os.getenv("bot_token")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 SCHEDULE_URL = "https://1502.mskobr.ru/uchashimsya/raspisanie-kanikuly"
 
 def main():
