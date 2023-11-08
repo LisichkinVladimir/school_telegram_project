@@ -7,6 +7,7 @@ import sys
 import re
 from bs4 import BeautifulSoup
 import config as cfg
+
 class SchoolClass:
     """
     Школьный класс
