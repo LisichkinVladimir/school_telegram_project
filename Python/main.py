@@ -8,6 +8,7 @@ from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandl
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 import config as cfg
 from schedule_parser import Schedules, Schedule, SchoolClass
+from data import BotData, get_schedules
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
 используй команду /start для начала работы бота"""
@@ -36,7 +37,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logging.info("command start")
     user = update.effective_user
     reply_markup = keyboard_button_schedule()
-    context.user_data["schedules"] = None
+    if "BotData" not in context.user_data:
+        bot_data = BotData(user.first_name)
+        context.user_data["BotData"] = bot_data
+    else:
+        bot_data: BotData = context.user_data["BotData"]
+        bot_data.clear_schedules()
 
     await update.message.reply_text(
         f"Привет {user.first_name}! \n{HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
@@ -48,11 +54,7 @@ def keyboard_button_departments(context: ContextTypes.DEFAULT_TYPE) -> InlineKey
     """
     Добавление кнопок корпусов
     """
-    schedules = context.user_data["schedules"]
-    if schedules is None:
-        schedules = Schedules()
-        schedules.parse(cfg.SCHEDULE_URL)
-        context.user_data["schedules"] = schedules
+    schedules: Schedules = get_schedules(context)
     keyboard = []
     index = 0
     for schedule in schedules.list:
@@ -90,7 +92,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return START_ROUTES
     else:
         # Нажата кнопка корпуса
-        schedules: Schedules = context.user_data["schedules"]
+        schedules: Schedules = get_schedules(context)
         if schedules is None:
             await query.edit_message_text("Список корпусов не определен")
             return START_ROUTES
@@ -129,7 +131,7 @@ async def class_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return START_ROUTES
     else:
         # Разбор pdf файла недельного расписания
-        schedules: Schedules = context.user_data["schedules"]
+        schedules: Schedules = get_schedules(context)
         if schedules is None:
             await query.edit_message_text("Список корпусов не определен")
             return START_ROUTES

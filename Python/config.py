@@ -11,7 +11,6 @@ if not logging.getLogger().hasHandlers():
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if BOT_TOKEN is None:
     logging.info("BOT_TOKEN is None")
-    BOT_TOKEN = "APAK_dNuJQb2XLJGOf_xEw_hC9b8qhOPEAA:0710988466"[::-1]
 else:
     logging.info("BOT_TOKEN is not None")
 BASE_URL = "https://1502.mskobr.ru"
