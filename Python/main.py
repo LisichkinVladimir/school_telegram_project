@@ -2,8 +2,8 @@
 Основной модуль бота telegram
 python-telegram-bot
 """
-import logging
 import sys
+import logging
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 import config as cfg
@@ -106,7 +106,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             index += 1
             keyboard.append(button)
         keyboard.append([InlineKeyboardButton("<<Назад", callback_data="CLASS-1")])
-        reply_markup = InlineKeyboardMarkup(keyboard)    
+        reply_markup = InlineKeyboardMarkup(keyboard)
         query = update.callback_query
         await query.edit_message_text("Выберете класс", reply_markup=reply_markup)
         return START_ROUTES
@@ -155,7 +155,7 @@ def main() -> None:
     # Запуск логирования
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    logging.info(f"Start bot")
+    logging.info("Start bot")
     application = Application.builder().token(cfg.BOT_TOKEN).build()
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))

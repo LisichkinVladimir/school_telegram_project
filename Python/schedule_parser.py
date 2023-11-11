@@ -1,10 +1,10 @@
 """
 Модуль разбора учебного расписания
 """
-import logging
-import requests
 import sys
 import re
+import logging
+import requests
 from bs4 import BeautifulSoup
 import config as cfg
 
@@ -27,14 +27,17 @@ class SchoolClass:
 
     @property
     def name(self) -> str:
+        """ Свойство name - название класса """
         return self.__name
 
     @property
     def number(self) -> int:
+        """ Свойство number - номер класса """
         return self.__number
 
     @property
     def link(self) -> str:
+        """ Свойство link - url с расписанием класса """
         return self.__link
 
 class Schedule:
@@ -42,28 +45,41 @@ class Schedule:
     Класс расписание
     """
     def __init__(self, department: str):
+        """
+        Конструктор класса
+        department: название территории расписания
+        """
         self.__department: str = department
         self.__classes: list = []
 
     def add_class(self, class_: SchoolClass):
+        """ Метод добавление класса к списку классов """
         self.__classes.append(class_)
 
     @property
     def department(self) -> str:
+        """ Свойство возвращающее название территории """
         return self.__department
 
     @property
     def class_list(self) -> list:
+        """ Свойство возвращающее список классов территории """
         return self.__classes
 
 class Schedules:
     """
-    Класс расписания
+    Класс расписания (список всех расписаний)
     """
     def __init__(self):
+        """
+        Конструктор класса
+        """
         self.__list: list = []
 
     def parse(self, url: str) -> bool:
+        """
+        Процедура разбора url расписания
+        """
         # Получение html из Web
         response = requests.get(url)
         if response.status_code != 200:
@@ -75,7 +91,7 @@ class Schedules:
         # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')
         h3_list = xml_data.find_all(
-                ['h3'], 
+                ['h3'],
                 attrs = {"class": "toggle-heading", "style": "text-align: center;"}
                 #string='span style'
         )
@@ -94,7 +110,7 @@ class Schedules:
                         rows = table_body.find_all('tr')
 
                         for row in rows:
-                            cols = row.find_all('td')                            
+                            cols = row.find_all('td')
                             for col in cols:
                                 # Разбор данных о классе
                                 if col.text and col.text != '\xa0':
@@ -109,6 +125,7 @@ class Schedules:
 
     @property
     def list(self) -> list:
+        """ Свойство возвращающее список территорий """
         return self.__list
 
 def main():

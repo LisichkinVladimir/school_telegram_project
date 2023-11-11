@@ -11,10 +11,14 @@ class BotData:
     Данные сессии бота
     """
     def __init__(self):
+        """
+        Конструктор класса
+        """
         self.__schedules: Schedules = None
 
     @property
     def schedules(self) -> Schedules:
+        """ Свойство возвращающее расписания """
         if self.__schedules is None:
             self.__schedules = Schedules()
             # TODO сделать хранение и получение данных в SqLite
@@ -49,7 +53,7 @@ def get_schedules(context: ContextTypes.DEFAULT_TYPE) -> Schedules:
         return context.user_data["BotData"].schedules
     else:
         logging.info("Context bot_data and user_data is none")
-        return BotData().schedules()
+        return BotData().schedules
 
 def main():
     raise SystemError("This file cannot be operable")
