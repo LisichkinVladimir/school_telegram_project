@@ -16,6 +16,13 @@ else:
 BASE_URL = "https://1502.mskobr.ru"
 SCHEDULE_URL = f"{BASE_URL}/uchashimsya/raspisanie-kanikuly"
 
+def disable_logger(log_list: list) -> None:
+    """
+    Отключает логирование для выбранных модулей
+    """
+    for log in log_list:
+        logging.getLogger(log).disabled = True
+
 def main():
     raise SystemError("This file cannot be operable")
 

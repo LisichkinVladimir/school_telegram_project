@@ -7,6 +7,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import config as cfg
+from week_pdf_parser import WeekSchedule
 
 class SchoolClass:
     """
@@ -24,6 +25,7 @@ class SchoolClass:
         if match and name[:match.end()].isnumeric():
             self.__number = int(name[:match.end()])
         self.__link: str = link
+        self.__week_schedule: WeekSchedule = None
 
     @property
     def name(self) -> str:
@@ -39,6 +41,14 @@ class SchoolClass:
     def link(self) -> str:
         """ Свойство link - url с расписанием класса """
         return self.__link
+
+    @property
+    def week_schedule(self) -> WeekSchedule:
+        """" Свойство расписание на неделю """
+        if self.__week_schedule is None:
+            self.__week_schedule = WeekSchedule(cfg.BASE_URL + "/" + self.__link)
+            self.__week_schedule.parse()
+        return self.__week_schedule
 
 class Schedule:
     """
@@ -75,18 +85,21 @@ class Schedules:
         Конструктор класса
         """
         self.__list: list = []
+        self.__hash: int  = 0
 
     def parse(self, url: str) -> bool:
         """
         Процедура разбора url расписания
         """
+        self.__hash = 0
         # Получение html из Web
         response = requests.get(url)
         if response.status_code != 200:
             logging.error(f"Error get {url}. error code {response.status_code}")
             return False
         data = response.text
-        logging.info(f"get {data[:20]}...\n")
+        logging.info(f"get {data[:25]}...\n")
+        self.__hash = hash(data)
 
         # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')
@@ -128,11 +141,16 @@ class Schedules:
         """ Свойство возвращающее список территорий """
         return self.__list
 
+    def hash(self) -> int:
+        """ Свойство возвращающее hash расписания """
+        return self.__hash
+
 def main():
     """
     Разбора учебного расписания
     """
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    if not logging.getLogger().hasHandlers():
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     schedules = Schedules()
     schedules.parse(cfg.SCHEDULE_URL)
     print("----------------------------------------------")
