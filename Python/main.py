@@ -235,10 +235,8 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         day_of_week_list = week_schedule.day_of_week_list(menu_data.week_ind + 1)
         message = f"{message}\n{day_of_week_list[menu_data.dow_ind]}:\n"
         for lesson in lessons:
-            if lesson.hour_end == lesson.ident.hour_start:
-                message += f"{lesson.ident.hour_start}  {lesson.name} каб.{lesson.office}\n"
-            else:
-                message += f"{lesson.ident.hour_start}-{lesson.hour_end} {lesson.name} каб.{lesson.office}\n"
+            lesson_string = str(lesson)
+            message += f"{lesson_string}\n"
         await query.edit_message_text(message)
         return START_ROUTES
 

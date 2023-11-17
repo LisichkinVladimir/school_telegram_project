@@ -71,6 +71,7 @@ class Lesson:
         self.__group: str = group
         self.__teacher: str = teacher
         self.__row_data: str = row_data
+        self.__groups: list = []
 
     @property
     def ident(self) -> LessonIdent:
@@ -111,6 +112,28 @@ class Lesson:
         """" Сырые данные из ячейки pdf таблицы """
         return self.__row_data
 
+    @property
+    def groups(self) -> list:
+        """" разбиение урока на группы """
+        return self.__groups
+
+    def __str__(self) -> str:
+        """ Конвертация урока в строку """
+        if self.ident.hour_start == self.hour_end:
+            result = str(self.ident.hour_start)
+        else:
+            result = f"{self.ident.hour_start}-{self.hour_end}"
+        if self.office:
+            result = f"{result} {self.name} каб.{self.office}"
+        else:
+            result = f"{result} {self.name}"
+        if len(self.groups) > 0:
+            if self.group:
+                result = f"{result} группа {self.group}"
+            for group_item in self.groups:
+                result = f"{result} / {group_item.name} каб.{group_item.office} группа {group_item.group}"
+        return result
+
 class WeekSchedule:
     """
     Расписание класса на неделю/две недели
@@ -134,6 +157,49 @@ class WeekSchedule:
         """
         Процедура разбора url расписания
         """
+        def parse_lesson(lesson: str, day_of_week: str) -> None:
+            """
+            Разобрать lesson - достать name/office/group
+            """
+            row_data = lesson
+            lesson = lesson.replace("\n", " ")
+            # group
+            group = None
+            if self.__class_name in lesson:
+                s = self.__class_name + R".\d{1}"
+                match = re.search(RF"{s}", lesson)
+                if match:
+                    group = lesson[match.start():match.end()]
+                    lesson = lesson.replace(group, "")
+                else:
+                    s = self.__class_name + R"\d{1}"
+                    match = re.search(RF"{s}", lesson)
+                    if match:
+                        group = lesson[match.start():match.end()]
+                        lesson = lesson.replace(group, "")
+            # office
+            office = None
+            match = re.search(R"\d+\D{0,1}", lesson)
+            if match:
+                office = lesson[match.start():match.end()].strip()
+                lesson = lesson.replace(office, "").strip()
+            # teacher
+            teacher = None
+            match = re.search(R"\s[а-яА-Я]+\s\D\.\D\.", lesson)
+            if match:
+                teacher = lesson[match.start():].strip()
+                lesson = lesson.replace(teacher, "").strip()
+            name = lesson
+            logging.info(f"day_of_week={day_of_week} lesson={name} group={group} office={office} teacher={teacher}")
+            lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week)
+            new_lesson = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, row_data = row_data)
+            if lesson_ident not in self.__lesson_dict:
+                self.__lesson_dict[lesson_ident] = new_lesson
+            else:
+                # Разбиение урока на группы
+                lesson: Lesson = self.__lesson_dict[lesson_ident]
+                lesson.groups.append(new_lesson)
+
         self.__hash = 0
         # Получение html из Web
         response = requests.get(self.__url)
@@ -161,12 +227,12 @@ class WeekSchedule:
                 element_num += 1
                 if isinstance(element, LTTextContainer):
                     s = element.get_text()
-                    if pages_num == 1 and element_num == 1:
-                        self.__department = s
-                        self.__department = self.__department.replace("\n", "")
-                    if pages_num == 1 and element_num == 2:
+                    if pages_num == 1 and element_num in [1, 2] and "Школа №1502" not in s:
                         self.__class_name = s
-                        self.__class_name = self.__class_name.replace('ГБОУ "Школа №1502 при МЭИ",', '').strip()
+                        self.__class_name = self.__class_name.replace("\n", "")
+                    if pages_num == 1 and element_num in [1, 2] and "Школа №1502" in s:
+                        self.__department = s
+                        self.__department = self.__department.replace('ГБОУ "Школа №1502 при МЭИ",', '').strip()
                     if s.find("Составлено:") >= 0:
                         match = re.search(R"\d{1,2}\.\d{1,2}\.\d{4}", s)
                         if match:
@@ -197,58 +263,39 @@ class WeekSchedule:
                     if hour_index >= 1:
                         week_index = hour_index - 1
                     week = 1
-                    # Цикл по часам
+                    # Цикл по часам i - столбец
                     for i in range(2, len(table)):
                         hour = int(table[i][hour_index])
                         if week_index is not None and table[i][week_index] is not None:
                             week = int(table[i][week_index])
                         logging.info(f"week={week} hour={hour}")
-                        # Цикл по дням недели
-                        for x, index in enumerate(week_indexes):
-                            day_of_week = week_names[x]
-                            lesson = table[i][index]
-                            if lesson:
-                                # Есть урок
-                                row_data = lesson
-                                lesson = lesson.replace("\n", " ")
-                                # Разобрать lesson - достать name/office/group
-                                # group
-                                group = None
-                                if self.__class_name in lesson:
-                                    s = self.__class_name + R".\d{1}"
-                                    match = re.search(RF"{s}", lesson)
-                                    if match:
-                                        group = lesson[match.start():match.end()]
-                                        lesson = lesson.replace(group, "")
-                                # office
-                                office = None
-                                match = re.search(R"\d+\D{0,1}", lesson)
-                                if match:
-                                    office = lesson[match.start():match.end()].strip()
-                                    lesson = lesson.replace(office, "").strip()
-                                # teacher
-                                teacher = None
-                                match = re.search(R"\s[а-яА-Я]+\s\D\.\D\.", lesson)
-                                if match:
-                                    teacher = lesson[match.start():].strip()
-                                    lesson = lesson.replace(teacher, "").strip()
-                                name = lesson
-                                logging.info(f"day_of_week={day_of_week} lesson={name} group={group} office={office} teacher={teacher}")
-                                lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week)
-                                if lesson_ident not in self.__lesson_dict:
-                                    self.__lesson_dict[lesson_ident] = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, row_data = row_data)
-                                else:
-                                    lesson: Lesson = self.__lesson_dict[lesson_ident]
-                                    lesson.hour_end = hour
-                            elif i > 2 and table[i-1][index]:
-                                # lesson is None но предыдущий столбец есть
-                                prev_row_data = table[i-1][index]
-                                lesson_ident: LessonIdent = LessonIdent(week, hour-1, day_of_week)
-                                if lesson_ident in self.__lesson_dict:
-                                    lesson: Lesson = self.__lesson_dict[lesson_ident]
-                                    if lesson.row_data == prev_row_data:
-                                        lesson.hour_end = hour
-                                        self.__lesson_dict[lesson_ident] = lesson
+                        # Цикл по дням недели j - строчка
+                        for j in range(hour_index + 1, len(table[i])):
+                            day_of_week = None
+                            index = week_indexes.index(j) if j in week_indexes else None
+                            if index is not None:
+                                day_of_week = week_names[index]
+                            else:
+                                index = week_indexes.index(j - 1) if j - 1 in week_indexes else None
+                                if index is not None:
+                                    day_of_week = week_names[index]
+                            if day_of_week:
+                                lesson = table[i][j]
+                                if lesson is not None and lesson != '':
+                                    # Есть урок
+                                    parse_lesson(lesson, day_of_week)
+                                elif i > 2 and table[i-1][j]:
+                                    # lesson is None но предыдущий столбец есть
+                                    prev_row_data = table[i-1][j]
+                                    lesson_ident: LessonIdent = LessonIdent(week, hour-1, day_of_week)
+                                    if lesson_ident in self.__lesson_dict:
+                                        lesson: Lesson = self.__lesson_dict[lesson_ident]
+                                        if lesson.row_data == prev_row_data:
+                                            lesson.hour_end = hour
+                                        elif len(lesson.groups) > 0:
+                                            for group in lesson.groups:
+                                                if group.row_data == prev_row_data:
+                                                    group.hour_end = hour
 
     def week_list(self) -> list:
         """
@@ -315,10 +362,8 @@ def main():
         for day_of_week in schedule.day_of_week_list(week):
             print(f"week-{week} day_of_week-{day_of_week}")
             for lesson in schedule.lesson_list(week, day_of_week):
-                if lesson.hour_end == lesson.ident.hour_start:
-                    print(f"{lesson.ident.hour_start}  {lesson.name} каб.{lesson.office}")
-                else:
-                    print(f"{lesson.ident.hour_start}-{lesson.hour_end} {lesson.name} каб.{lesson.office}")
+                lesson_string = str(lesson)
+                print(lesson_string)
 
 if __name__ == "__main__":
     main()
