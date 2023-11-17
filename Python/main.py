@@ -227,7 +227,13 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        message = ''
+        week_schedule, error_message = get_schedule_object("WEEK_SCHEDULE", menu_data, context)
+        if error_message:
+            await query.edit_message_text(error_message)
+            return START_ROUTES
+        message = f"Расписание для класса {week_schedule.class_name}/{week_schedule.department}\n{week_schedule.url}\n"
+        day_of_week_list = week_schedule.day_of_week_list(menu_data.week_ind + 1)
+        message = f"{message}\n{day_of_week_list[menu_data.dow_ind]}:\n"
         for lesson in lessons:
             if lesson.hour_end == lesson.ident.hour_start:
                 message += f"{lesson.ident.hour_start}  {lesson.name} каб.{lesson.office}\n"

@@ -162,11 +162,11 @@ class WeekSchedule:
                 if isinstance(element, LTTextContainer):
                     s = element.get_text()
                     if pages_num == 1 and element_num == 1:
-                        self.__class_name = s
-                        self.__class_name = self.__class_name.replace("\n", "")
-                    if pages_num == 1 and element_num == 2:
                         self.__department = s
-                        self.__department = self.__department.replace('ГБОУ "Школа №1502 при МЭИ",', '').strip()
+                        self.__department = self.__department.replace("\n", "")
+                    if pages_num == 1 and element_num == 2:
+                        self.__class_name = s
+                        self.__class_name = self.__class_name.replace('ГБОУ "Школа №1502 при МЭИ",', '').strip()
                     if s.find("Составлено:") >= 0:
                         match = re.search(R"\d{1,2}\.\d{1,2}\.\d{4}", s)
                         if match:
@@ -284,6 +284,21 @@ class WeekSchedule:
     def hash(self) -> int:
         """ Свойство хэш pdf """
         return self.__hash
+
+    @property
+    def department(self) -> str:
+        """ Свойство корпус """
+        return self.__department
+
+    @property
+    def class_name(self) -> str:
+        """ Свойство имя класса """
+        return self.__class_name
+
+    @property
+    def url(self) -> str:
+        """ Свойство url pdf файла """
+        return self.__url
 
 def main():
     """

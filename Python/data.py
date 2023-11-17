@@ -126,6 +126,8 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     week_schedule: WeekSchedule = school_class.week_schedule
     if week_schedule is None:
         return None, "Список недель не определен"
+    if class_name == "WEEK_SCHEDULE":
+        return week_schedule, None
     week_list = week_schedule.week_list()
     if class_name == "WEEK":
         return week_list, None
