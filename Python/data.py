@@ -22,8 +22,7 @@ class BotData:
         """ Свойство возвращающее расписания """
         if self.__schedules is None:
             self.__schedules = Schedules()
-            # TODO сделать хранение и получение данных в SqLite
-            self.__schedules.parse(cfg.SCHEDULE_URL)
+        self.__schedules.parse(cfg.SCHEDULE_URL)
         return self.__schedules
 
 def create_schedules(context: ContextTypes.DEFAULT_TYPE) -> None:

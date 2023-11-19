@@ -150,7 +150,7 @@ class Lesson:
             result = f"{result} {self.teacher}"
         if len(self.groups) > 0:
             for group_item in self.groups:
-                result = f"{result} // {group_item.name}"
+                result = f"{result} / {group_item.name}"
                 if self.PRINT_OFFICE in what_to_print and group_item.office:
                     result = f"{result} каб.{group_item.office}"
                 if self.PRINT_GROUP in what_to_print and group_item.group:

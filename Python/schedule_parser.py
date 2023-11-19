@@ -6,6 +6,7 @@ import re
 import logging
 import requests
 from bs4 import BeautifulSoup
+from hashlib import md5
 import config as cfg
 from week_pdf_parser import WeekSchedule
 
@@ -85,13 +86,12 @@ class Schedules:
         Конструктор класса
         """
         self.__list: list = []
-        self.__hash: int  = 0
+        self.__hash: str  = ""
 
     def parse(self, url: str) -> bool:
         """
         Процедура разбора url расписания
         """
-        self.__hash = 0
         # Получение html из Web
         response = requests.get(url)
         if response.status_code != 200:
@@ -99,7 +99,17 @@ class Schedules:
             return False
         data = response.text
         logging.info(f"get {data[:25]}...\n")
-        self.__hash = hash(data)
+
+        # Уберем уникальные строки для подсчета хэша
+        data_for_hash = re.sub(pattern = r"<link rel=\"stylesheet\" href=\"/css/app-project/app\.css.*/>", repl = "", string = data)
+        data_for_hash = re.sub(pattern = r"<script defer src=\"/js/app-project/app.*</script>", repl = "", string = data_for_hash)
+        data_for_hash = re.sub(pattern = r"<script async src=\"/js/app-project/build.*</script>", repl = "", string = data_for_hash)
+        data_for_hash = data_for_hash.encode('utf-8', errors='ignore')
+        new_hash = md5(data_for_hash).hexdigest()
+        logging.info(f"hash {new_hash}")
+        if self.__hash == new_hash:
+            return
+        self.__hash = new_hash
 
         # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')
@@ -141,7 +151,7 @@ class Schedules:
         """ Свойство возвращающее список территорий """
         return self.__list
 
-    def hash(self) -> int:
+    def hash(self) -> str:
         """ Свойство возвращающее hash расписания """
         return self.__hash
 
