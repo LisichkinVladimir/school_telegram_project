@@ -4,11 +4,12 @@
 import sys
 import re
 import logging
+from hashlib import md5
 import requests
 from bs4 import BeautifulSoup
-from hashlib import md5
 import config as cfg
 from week_pdf_parser import WeekSchedule
+from cache_func import timed_lru_cache
 
 class SchoolClass:
     """
@@ -48,7 +49,7 @@ class SchoolClass:
         """" Свойство расписание на неделю """
         if self.__week_schedule is None:
             self.__week_schedule = WeekSchedule(cfg.BASE_URL + "/" + self.__link)
-            self.__week_schedule.parse()
+        self.__week_schedule.parse()
         return self.__week_schedule
 
 class Schedule:
@@ -88,6 +89,7 @@ class Schedules:
         self.__list: list = []
         self.__hash: str  = ""
 
+    @timed_lru_cache(60*60*24)
     def parse(self, url: str) -> bool:
         """
         Процедура разбора url расписания
@@ -110,6 +112,7 @@ class Schedules:
         if self.__hash == new_hash:
             return
         self.__hash = new_hash
+        self.__list = []
 
         # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')

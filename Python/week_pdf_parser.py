@@ -6,12 +6,14 @@ import io
 import logging
 import re
 from datetime import datetime
+from hashlib import md5
 import requests
 from PyPDF2 import PdfReader
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTPage
 from telegram.constants import ParseMode
 import pdfplumber
+from cache_func import timed_lru_cache
 import config as cfg
 
 class LessonIdent:
@@ -150,7 +152,7 @@ class Lesson:
             result = f"{result} {self.teacher}"
         if len(self.groups) > 0:
             for group_item in self.groups:
-                result = f"{result} / {group_item.name}"
+                result = f"{result} // {group_item.name}"
                 if self.PRINT_OFFICE in what_to_print and group_item.office:
                     result = f"{result} каб.{group_item.office}"
                 if self.PRINT_GROUP in what_to_print and group_item.group:
@@ -175,9 +177,10 @@ class WeekSchedule:
         self.__department: str = None
         self.__url: str = url
         self.__created = None
-        self.__hash = None
+        self.__hash: str = ""
         self.__lesson_dict = {}
 
+    @timed_lru_cache(60*60*24)
     def parse(self) -> bool:
         """
         Процедура разбора url расписания
@@ -225,13 +228,24 @@ class WeekSchedule:
                 lesson: Lesson = self.__lesson_dict[lesson_ident]
                 lesson.groups.append(new_lesson)
 
-        self.__hash = 0
         # Получение html из Web
         response = requests.get(self.__url)
         if response.status_code != 200:
             logging.error(f"Error get {self.__url}. error code {response.status_code}")
             return False
-        self.__hash = hash(response.content)
+
+        # Вычисление хэша
+        new_hash = md5(response.content).hexdigest()
+        logging.info(f"hash {new_hash}")
+        if self.__hash == new_hash:
+            return
+
+        self.__hash = new_hash
+        self.__lesson_dict = {}
+        self.__class_name = None
+        self.__department = None
+        self.__created = None
+
         mem_obj = io.BytesIO(response.content)
         pdfReader = PdfReader(mem_obj)
         # printing number of pages in pdf file
@@ -353,7 +367,7 @@ class WeekSchedule:
         return result
 
     @property
-    def hash(self) -> int:
+    def hash(self) -> str:
         """ Свойство хэш pdf """
         return self.__hash
 
