@@ -10,6 +10,7 @@ import requests
 from PyPDF2 import PdfReader
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTPage
+from telegram.constants import ParseMode
 import pdfplumber
 import config as cfg
 
@@ -55,6 +56,12 @@ class Lesson:
     """
     Урок
     """
+    PRINT_HOURS = 0
+    PRINT_OFFICE = 2
+    PRINT_GROUP = 4
+    PRINT_TEACHER = 8
+    PRINT_ALL: set = {PRINT_HOURS, PRINT_OFFICE, PRINT_GROUP, PRINT_TEACHER}
+
     def __init__(self, ident: LessonIdent, name: str, office: str, group: str, teacher: str, row_data: str = None):
         """
         Конструктор класса
@@ -117,22 +124,40 @@ class Lesson:
         """" разбиение урока на группы """
         return self.__groups
 
-    def __str__(self) -> str:
+    def to_str(self, what_to_print: set = PRINT_ALL, parse_mode = None) -> str:
         """ Конвертация урока в строку """
-        if self.ident.hour_start == self.hour_end:
-            result = str(self.ident.hour_start)
+        # Начало урока
+        if self.PRINT_HOURS in what_to_print:
+            if self.ident.hour_start == self.hour_end:
+                result = f"[{self.ident.hour_start}]"
+            else:
+                result = f"[{self.ident.hour_start}-{self.hour_end}]"
+            if result and parse_mode == ParseMode.HTML:
+                result = "<b>" + result + "</b>"
         else:
-            result = f"{self.ident.hour_start}-{self.hour_end}"
-        if self.office:
-            result = f"{result} {self.name} каб.{self.office}"
-        else:
+            result = ""
+        # название урока
+        if self.name:
             result = f"{result} {self.name}"
+        # номер кабинета
+        if self.PRINT_OFFICE in what_to_print and self.office:
+            result = f"{result} каб.{self.office}"
+        # номер группы
+        if self.PRINT_GROUP in what_to_print and self.group:
+            result = f"{result} гр. {self.group}"
+        # преподаватель
+        if self.PRINT_TEACHER in what_to_print and self.teacher:
+            result = f"{result} {self.teacher}"
         if len(self.groups) > 0:
-            if self.group:
-                result = f"{result} группа {self.group}"
             for group_item in self.groups:
-                result = f"{result} / {group_item.name} каб.{group_item.office} группа {group_item.group}"
-        return result
+                result = f"{result} // {group_item.name}"
+                if self.PRINT_OFFICE in what_to_print and group_item.office:
+                    result = f"{result} каб.{group_item.office}"
+                if self.PRINT_GROUP in what_to_print and group_item.group:
+                    result = f"{result} гр. {group_item.group}"
+                if self.PRINT_TEACHER in what_to_print and group_item.teacher:
+                    result = f"{result} {group_item.teacher}"
+        return result.strip()
 
 class WeekSchedule:
     """
@@ -362,7 +387,7 @@ def main():
         for day_of_week in schedule.day_of_week_list(week):
             print(f"week-{week} day_of_week-{day_of_week}")
             for lesson in schedule.lesson_list(week, day_of_week):
-                lesson_string = str(lesson)
+                lesson_string = lesson.to_str()
                 print(lesson_string)
 
 if __name__ == "__main__":

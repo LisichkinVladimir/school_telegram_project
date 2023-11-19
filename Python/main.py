@@ -6,6 +6,7 @@ import sys
 import logging
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 import config as cfg
 from data import MenuData, create_schedules, get_schedule_object
 
@@ -235,9 +236,9 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         day_of_week_list = week_schedule.day_of_week_list(menu_data.week_ind + 1)
         message = f"{message}\n{day_of_week_list[menu_data.dow_ind]}:\n"
         for lesson in lessons:
-            lesson_string = str(lesson)
+            lesson_string = lesson.to_str(parse_mode = ParseMode.HTML)
             message += f"{lesson_string}\n"
-        await query.edit_message_text(message)
+        await query.edit_message_text(message, parse_mode=ParseMode.HTML)
         return START_ROUTES
 
 def main() -> None:
