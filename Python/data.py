@@ -3,7 +3,7 @@
 """
 import logging
 from telegram.ext import ContextTypes
-from schedule_parser import Schedules, Schedule, SchoolClass
+from schedule_parser import Schedule, Department, SchoolClass
 from week_pdf_parser import WeekSchedule
 import config as cfg
 
@@ -15,17 +15,17 @@ class BotData:
         """
         Конструктор класса
         """
-        self.__schedules: Schedules = None
+        self.__schedule: Schedule = None
 
     @property
-    def schedules(self) -> Schedules:
-        """ Свойство возвращающее расписания """
-        if self.__schedules is None:
-            self.__schedules = Schedules()
-        self.__schedules.parse(cfg.SCHEDULE_URL)
-        return self.__schedules
+    def schedule(self) -> Schedule:
+        """ Свойство возвращающее расписание """
+        if self.__schedule is None:
+            self.__schedule = Schedule()
+        self.__schedule.parse(cfg.SCHEDULE_URL)
+        return self.__schedule
 
-def create_schedules(context: ContextTypes.DEFAULT_TYPE) -> None:
+def create_schedule(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Создать расписание
     """
@@ -40,20 +40,20 @@ def create_schedules(context: ContextTypes.DEFAULT_TYPE) -> None:
             bot_data = BotData()
             context.user_data["BotData"] = bot_data
 
-def get_schedules(context: ContextTypes.DEFAULT_TYPE) -> Schedules:
+def get_schedule(context: ContextTypes.DEFAULT_TYPE) -> Schedule:
     """
     Получить расписания
     """
-    create_schedules(context)
+    create_schedule(context)
     if context.bot_data is not None and "BotData" in context.bot_data:
-        logging.info("Get schedules from bot_data")
-        return context.bot_data["BotData"].schedules
+        logging.info("Get schedule from bot_data")
+        return context.bot_data["BotData"].schedule
     elif context.user_data is not None and "BotData" in context.user_data:
-        logging.info("Get schedules from user_data")
-        return context.user_data["BotData"].schedules
+        logging.info("Get schedule from user_data")
+        return context.user_data["BotData"].schedule
     else:
         logging.info("Context bot_data and user_data is none")
-        return BotData().schedules
+        return BotData().schedule
 
 class MenuData:
     """
@@ -103,24 +103,24 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     """
     Получить объект типа class_name
     """
-    schedules: Schedules = get_schedules(context)
-    if schedules is None:
-        return None, "Список корпусов не определен"
+    schedule: Schedule = get_schedule(context)
+    if schedule is None:
+        return None, "Расписание не загружено"
     if class_name == "DEPARTMENT":
-        return schedules, None
+        return schedule, None
 
     department_index = menu_data.dep_ind
-    if department_index < 0 or department_index > len(schedules.list)-1:
+    if department_index < 0 or department_index > len(schedule.departments)-1:
         return None, "Индекс корпуса не корректен"
     if class_name == "CLASS":
-        return schedules.list[department_index], None
+        return schedule.departments[department_index], None
 
     class_index = menu_data.cls_ind
-    schedule: Schedule = schedules.list[department_index]
-    if class_index < 0 or class_index > len(schedule.class_list)-1:
+    department: Department = schedule.departments[department_index]
+    if class_index < 0 or class_index > len(department.class_list)-1:
         return None, "Индекс класса не корректен"
 
-    school_class: SchoolClass = schedule.class_list[class_index]
+    school_class: SchoolClass = department.class_list[class_index]
     # Разбор pdf файла недельного расписания
     week_schedule: WeekSchedule = school_class.week_schedule
     if week_schedule is None:

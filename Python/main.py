@@ -8,7 +8,7 @@ from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandl
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 import config as cfg
-from data import MenuData, create_schedules, get_schedule_object
+from data import MenuData, create_schedule, get_schedule_object
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
 используй команду /start для начала работы бота"""
@@ -37,7 +37,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logging.info("command start")
     user = update.effective_user
     reply_markup = keyboard_button_schedule()
-    create_schedules(context)
+    create_schedule(context)
 
     await update.message.reply_text(
         f"Привет {user.first_name}! \n{HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
@@ -49,13 +49,13 @@ def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAU
     """
     Добавление кнопок корпусов
     """
-    schedules, error_message = get_schedule_object("DEPARTMENT", menu_data, context)
+    schedule, error_message = get_schedule_object("DEPARTMENT", menu_data, context)
     if error_message:
         return None, error_message
     keyboard = []
     index = 0
-    for schedule in schedules.list:
-        button = [InlineKeyboardButton(schedule.department, callback_data=MenuData(index).to_string("DEPARTMENT"))]
+    for department in schedule.departments:
+        button = [InlineKeyboardButton(department.name, callback_data=MenuData(index).to_string("DEPARTMENT"))]
         index += 1
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string("DEPARTMENT"))])
@@ -65,7 +65,7 @@ async def schedule_button(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """
     Нажата кнопка получения расписания
     """
-    logging.info("command schedules")
+    logging.info("command schedule")
     query = update.callback_query
     await query.answer()
 
@@ -81,13 +81,13 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
     """
     Получение списка классов для корпуса department_index
     """
-    schedule, error_message = get_schedule_object("CLASS", menu_data, context)
+    department, error_message = get_schedule_object("CLASS", menu_data, context)
     if error_message:
         return None, error_message
 
     keyboard = []
     index = 0
-    for class_ in schedule.class_list:
+    for class_ in department.class_list:
         button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.dep_ind, index).to_string("CLASS"))]
         index += 1
         keyboard.append(button)

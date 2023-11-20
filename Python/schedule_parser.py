@@ -21,12 +21,16 @@ class SchoolClass:
         name: название класса
         link: ссылка на pdf файл, содержащий расписание
         """
+        # название класса
         self.__name: str = name
         match = re.search(R"^\d{1,2}", name)
+        # номер класса
         self.__number: int = None
         if match and name[:match.end()].isnumeric():
             self.__number = int(name[:match.end()])
+        # url с расписанием класса на неделю
         self.__link: str = link
+        # расписание на неделю
         self.__week_schedule: WeekSchedule = None
 
     @property
@@ -52,16 +56,18 @@ class SchoolClass:
         self.__week_schedule.parse()
         return self.__week_schedule
 
-class Schedule:
+class Department:
     """
-    Класс расписание
+    Класс подразделение (корпус) школы
     """
-    def __init__(self, department: str):
+    def __init__(self, name: str):
         """
         Конструктор класса
-        department: название территории расписания
+        name: название территории расписания
         """
-        self.__department: str = department
+        # название
+        self.__name: str = name
+        # список классов
         self.__classes: list = []
 
     def add_class(self, class_: SchoolClass):
@@ -69,24 +75,26 @@ class Schedule:
         self.__classes.append(class_)
 
     @property
-    def department(self) -> str:
+    def name(self) -> str:
         """ Свойство возвращающее название территории """
-        return self.__department
+        return self.__name
 
     @property
     def class_list(self) -> list:
         """ Свойство возвращающее список классов территории """
         return self.__classes
 
-class Schedules:
+class Schedule:
     """
-    Класс расписания (список всех расписаний)
+    Класс расписание
     """
     def __init__(self):
         """
         Конструктор класса
         """
-        self.__list: list = []
+        # список корпусов
+        self.__departments: list = []
+        # хэш последнего разбора расписания
         self.__hash: str  = ""
 
     @timed_lru_cache(60*60*24)
@@ -112,7 +120,7 @@ class Schedules:
         if self.__hash == new_hash:
             return
         self.__hash = new_hash
-        self.__list = []
+        self.__departments = []
 
         # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')
@@ -126,7 +134,7 @@ class Schedules:
         for h3 in h3_list:
             if '<h3 class="toggle-heading" style="text-align: center;"><span style="font-size' in str(h3):
                 logging.info(f"Department {h3.text}....")
-                schedule = Schedule(h3.text)
+                department = Department(h3.text)
 
                 # Поиск таблицы с расписаниями классов
                 for sibling in h3.next_siblings:
@@ -144,15 +152,15 @@ class Schedules:
                                     logging.info(f"Class {col.text} {url}")
                                     class_ = SchoolClass(col.text, url)
                                     if class_.number is not None or url is not None:
-                                        schedule.add_class(class_)
+                                        department.add_class(class_)
 
-                self.__list.append(schedule)
-        return len(self.__list) > 0
+                self.__departments.append(department)
+        return len(self.__departments) > 0
 
     @property
-    def list(self) -> list:
+    def departments(self) -> list:
         """ Свойство возвращающее список территорий """
-        return self.__list
+        return self.__departments
 
     def hash(self) -> str:
         """ Свойство возвращающее hash расписания """
@@ -164,12 +172,12 @@ def main():
     """
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    schedules = Schedules()
-    schedules.parse(cfg.SCHEDULE_URL)
+    schedule = Schedule()
+    schedule.parse(cfg.SCHEDULE_URL)
     print("----------------------------------------------")
-    for schedule in schedules.list:
-        print(schedule.department)
-        for class_ in schedule.class_list:
+    for department in schedule.departments:
+        print(department.name)
+        for class_ in department.class_list:
             print(f"{class_.name};", end="")
         print("\n")
 

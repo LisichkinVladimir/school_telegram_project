@@ -394,13 +394,13 @@ def main():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
     url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
-    schedule = WeekSchedule(url)
-    schedule.parse()
+    week_schedule = WeekSchedule(url)
+    week_schedule.parse()
     print("----------------------------------------------")
-    for week in schedule.week_list():
-        for day_of_week in schedule.day_of_week_list(week):
+    for week in week_schedule.week_list():
+        for day_of_week in week_schedule.day_of_week_list(week):
             print(f"week-{week} day_of_week-{day_of_week}")
-            for lesson in schedule.lesson_list(week, day_of_week):
+            for lesson in week_schedule.lesson_list(week, day_of_week):
                 lesson_string = lesson.to_str()
                 print(lesson_string)
 
