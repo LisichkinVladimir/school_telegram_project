@@ -5,7 +5,7 @@ python-telegram-bot
 import sys
 import logging
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 import config as cfg
 from data import MenuData, create_schedule, get_schedule_object
@@ -34,8 +34,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Отправить сообщение, когда выполнена команда /start.
     """
-    logging.info("command start")
-    user = update.effective_user
+    user: User = update.effective_user
+    logging.info(f"command start for {user.id}")
     reply_markup = keyboard_button_schedule()
     create_schedule(context)
 
@@ -69,7 +69,7 @@ async def schedule_button(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    menu_data = MenuData.from_string("DEPARTMENT", query.data)
+    menu_data: MenuData = MenuData.from_string("DEPARTMENT", query.data)
     reply_markup, error_message = keyboard_button_departments(menu_data, context)
     if error_message:
         await query.edit_message_text(error_message)
@@ -88,7 +88,7 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
     keyboard = []
     index = 0
     for class_ in department.class_list:
-        button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.dep_ind, index).to_string("CLASS"))]
+        button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.department, index).to_string("CLASS"))]
         index += 1
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string("CLASS"))])
@@ -101,8 +101,8 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     logging.info("command department")
     query = update.callback_query
     await query.answer()
-    menu_data = MenuData.from_string("DEPARTMENT", query.data)
-    if menu_data.dep_ind == -1:
+    menu_data: MenuData = MenuData.from_string("DEPARTMENT", query.data)
+    if menu_data.department == -1:
         # Нажата кнопка возврата
         reply_markup = keyboard_button_schedule()
         await query.edit_message_text(HELLO_MESSAGE, reply_markup=reply_markup)
@@ -127,10 +127,10 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
     keyboard = []
     index = 0
     for week_day in day_of_week_list:
-        button = [InlineKeyboardButton(week_day, callback_data=MenuData(menu_data.dep_ind, menu_data.cls_ind, menu_data.week_ind, index).to_string("DAY_OF_WEEK"))]
+        button = [InlineKeyboardButton(week_day, callback_data=MenuData(menu_data.department, menu_data.class_, menu_data.week, index).to_string("DAY_OF_WEEK"))]
         index += 1
         keyboard.append(button)
-    keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.dep_ind, menu_data.cls_ind, -1).to_string("DAY_OF_WEEK"))])
+    keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string("DAY_OF_WEEK"))])
     return InlineKeyboardMarkup(keyboard), None
 
 def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -142,15 +142,15 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
         return None, error_message
 
     if len(week_list) == 1:
-        return keyboard_button_day_of_week(MenuData(menu_data.dep_ind, menu_data.cls_ind, 1), context)
+        return keyboard_button_day_of_week(MenuData(menu_data.department, menu_data.class_, 1), context)
     elif len(week_list) > 1:
         index = 0
         keyboard = []
         for week in week_list:
-            button = [InlineKeyboardButton(f"Неделя месяца {week}", callback_data=MenuData(menu_data.dep_ind, menu_data.cls_ind, index).to_string("WEEK"))]
+            button = [InlineKeyboardButton(f"Неделя месяца {week}", callback_data=MenuData(menu_data.department, menu_data.class_, index).to_string("WEEK"))]
             index += 1
             keyboard.append(button)
-        keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.dep_ind, -1).to_string("WEEK"))])
+        keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, -1).to_string("WEEK"))])
         return InlineKeyboardMarkup(keyboard), None
     else:
         return "Ошибка получения списка недель", None
@@ -162,8 +162,8 @@ async def class_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     logging.info("command class")
     query = update.callback_query
     await query.answer()
-    menu_data = MenuData.from_string("CLASS", query.data)
-    if menu_data.dep_ind == -1:
+    menu_data: MenuData = MenuData.from_string("CLASS", query.data)
+    if menu_data.department == -1:
         # Нажата кнопка возврата
         reply_markup, error_message = keyboard_button_departments(menu_data, context)
         if error_message:
@@ -187,8 +187,8 @@ async def week_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     logging.info("command week")
     query = update.callback_query
     await query.answer()
-    menu_data = MenuData.from_string("WEEK", query.data)
-    if menu_data.cls_ind == -1:
+    menu_data: MenuData = MenuData.from_string("WEEK", query.data)
+    if menu_data.class_ == -1:
         # Нажата кнопка возврата
         reply_markup, error_message = keyboard_button_classes(menu_data, context)
         if error_message:
@@ -213,8 +213,8 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     logging.info("command day of week")
     query = update.callback_query
     await query.answer()
-    menu_data = MenuData.from_string("DAY_OF_WEEK", query.data)
-    if menu_data.week_ind == -1:
+    menu_data: MenuData = MenuData.from_string("DAY_OF_WEEK", query.data)
+    if menu_data.week == -1:
         # Нажата кнопка возврата
         reply_markup, error_message = keyboard_button_classes(menu_data, context)
         if error_message:
@@ -233,8 +233,8 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             await query.edit_message_text(error_message)
             return START_ROUTES
         message = f"Расписание для класса {week_schedule.class_name}/{week_schedule.department}\n{week_schedule.url}\n"
-        day_of_week_list = week_schedule.day_of_week_list(menu_data.week_ind + 1)
-        message = f"{message}\n{day_of_week_list[menu_data.dow_ind]}:\n"
+        day_of_week_list = week_schedule.day_of_week_list(menu_data.week + 1)
+        message = f"{message}\n{day_of_week_list[menu_data.day_of_week]}:\n"
         for lesson in lessons:
             lesson_string = lesson.to_str(parse_mode = ParseMode.HTML)
             message += f"{lesson_string}\n"

@@ -25,3 +25,19 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
         return wrapped_func
 
     return wrapper_cache
+
+def hash_string_to_byte(s: str) -> int:
+    """
+    Хеширование строки в три байта
+    """
+    byte_array = bytes(s, encoding='utf-8')
+    result: int = 5381
+    for byte in byte_array:
+        result = (((result << 5) + result) + byte) & 0xFFFF
+    return result
+
+def main():
+    raise SystemError("This file cannot be operable")
+
+if __name__ == "__main__":
+    main()

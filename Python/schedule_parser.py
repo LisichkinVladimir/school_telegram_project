@@ -9,13 +9,13 @@ import requests
 from bs4 import BeautifulSoup
 import config as cfg
 from week_pdf_parser import WeekSchedule
-from cache_func import timed_lru_cache
+from cache_func import timed_lru_cache, hash_string_to_byte
 
 class SchoolClass:
     """
     Школьный класс
     """
-    def __init__(self, name: str, link: str):
+    def __init__(self, name: str, link: str, department):
         """
         Конструктор класса
         name: название класса
@@ -30,8 +30,12 @@ class SchoolClass:
             self.__number = int(name[:match.end()])
         # url с расписанием класса на неделю
         self.__link: str = link
+        # корпус
+        self.__department = department
         # расписание на неделю
         self.__week_schedule: WeekSchedule = None
+        # идентификатор
+        self.__id = hash(self)
 
     @property
     def name(self) -> str:
@@ -56,6 +60,20 @@ class SchoolClass:
         self.__week_schedule.parse()
         return self.__week_schedule
 
+    @property
+    def department(self):
+        """ корпус класса """
+        return self.__department
+
+    @property
+    def id(self) -> int:
+        """ уникальный идентификатор """
+        return self.__id
+
+    def __hash__(self) -> int:
+        """ Вычисление хеша """
+        return hash_string_to_byte(self.__name + self.__department.name)
+
 class Department:
     """
     Класс подразделение (корпус) школы
@@ -69,6 +87,8 @@ class Department:
         self.__name: str = name
         # список классов
         self.__classes: list = []
+        # идентификатор
+        self.__id = hash(self)
 
     def add_class(self, class_: SchoolClass):
         """ Метод добавление класса к списку классов """
@@ -83,6 +103,15 @@ class Department:
     def class_list(self) -> list:
         """ Свойство возвращающее список классов территории """
         return self.__classes
+
+    @property
+    def id(self) -> int:
+        """ уникальный идентификатор """
+        return self.__id
+
+    def __hash__(self) -> int:
+        """ Вычисление хеша """
+        return hash_string_to_byte(self.__name)
 
 class Schedule:
     """
@@ -150,7 +179,7 @@ class Schedule:
                                 if col.text and col.text != '\xa0':
                                     url = None if col.a is None else col.a.get('href')
                                     logging.info(f"Class {col.text} {url}")
-                                    class_ = SchoolClass(col.text, url)
+                                    class_ = SchoolClass(col.text, url, department)
                                     if class_.number is not None or url is not None:
                                         department.add_class(class_)
 
@@ -158,9 +187,16 @@ class Schedule:
         return len(self.__departments) > 0
 
     @property
-    def departments(self) -> list:
+    def departments(self, has_classes: bool = True) -> list:
         """ Свойство возвращающее список территорий """
-        return self.__departments
+        if has_classes:
+            departments_list = []
+            for department in self.__departments:
+                if len(department.class_list) > 0:
+                    departments_list.append(department)
+            return departments_list
+        else:
+            return self.__departments
 
     def hash(self) -> str:
         """ Свойство возвращающее hash расписания """
@@ -175,11 +211,26 @@ def main():
     schedule = Schedule()
     schedule.parse(cfg.SCHEDULE_URL)
     print("----------------------------------------------")
+    id_dict = {}
     for department in schedule.departments:
-        print(department.name)
+        department_id = department.id
+        if department_id in id_dict:
+            id_dict[department_id] = id_dict[department_id] + 1
+        else:
+            id_dict[department_id] = 1
+        print(f"{department.name} {department_id}")
         for class_ in department.class_list:
-            print(f"{class_.name};", end="")
+            class_id = class_.id
+            if class_id in id_dict:
+                id_dict[class_id] = id_dict[class_id] + 1
+            else:
+                id_dict[class_id] = 1
+            print(f"{class_.name}/[{class_id}];", end="")
         print("\n")
+    print("----------------------------------------------")
+    for key, value in id_dict.items():
+        if value > 1:
+            print(f"duplicate id {key}")
 
 if __name__ == "__main__":
     main()

@@ -66,10 +66,10 @@ class MenuData:
         """
         Конструктор класса
         """
-        self.dep_ind: int = department
-        self.cls_ind: int = class_
-        self.week_ind: int = week
-        self.dow_ind: int = day_of_week
+        self.dp_i: int = department
+        self.c_i: int = class_
+        self.w_i: int = week
+        self.dw_i: int = day_of_week
 
     def to_string(self, prefix: str) -> str:
         """
@@ -99,6 +99,26 @@ class MenuData:
                     result.__dict__[key] = int(value)
         return result
 
+    @property
+    def department(self) -> int:
+        """ Корпус """
+        return self.dp_i
+
+    @property
+    def class_(self) -> int:
+        """ Класс """
+        return self.c_i
+
+    @property
+    def week(self) -> int:
+        """ Чередование по неделям"""
+        return self.w_i
+
+    @property
+    def day_of_week(self) -> int:
+        """ День недели """
+        return self.dw_i
+
 def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> any:
     """
     Получить объект типа class_name
@@ -109,13 +129,13 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     if class_name == "DEPARTMENT":
         return schedule, None
 
-    department_index = menu_data.dep_ind
+    department_index = menu_data.department
     if department_index < 0 or department_index > len(schedule.departments)-1:
         return None, "Индекс корпуса не корректен"
     if class_name == "CLASS":
         return schedule.departments[department_index], None
 
-    class_index = menu_data.cls_ind
+    class_index = menu_data.class_
     department: Department = schedule.departments[department_index]
     if class_index < 0 or class_index > len(department.class_list)-1:
         return None, "Индекс класса не корректен"
@@ -131,7 +151,7 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     if class_name == "WEEK":
         return week_list, None
 
-    week_index = menu_data.week_ind
+    week_index = menu_data.week
     if week_index < 0 or week_index > len(week_list)-1:
         return None, "Индекс недели не корректен"
     day_of_week_list = week_schedule.day_of_week_list(week_index + 1)
@@ -140,7 +160,7 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     if class_name == "DAY_OF_WEEK":
         return day_of_week_list, None
 
-    day_of_week_index = menu_data.dow_ind
+    day_of_week_index = menu_data.day_of_week
     if day_of_week_index < 0 or day_of_week_index > len(day_of_week_list)-1:
         return None, "Индекс дня недели не корректен"
     day_of_week = day_of_week_list[day_of_week_index]
