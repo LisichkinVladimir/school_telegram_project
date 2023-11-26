@@ -142,7 +142,7 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
         return None, error_message
 
     if len(week_list) == 1:
-        return keyboard_button_day_of_week(MenuData(menu_data.department, menu_data.class_, 1), context)
+        return keyboard_button_day_of_week(MenuData(menu_data.department, menu_data.class_, 0), context)
     elif len(week_list) > 1:
         index = 0
         keyboard = []

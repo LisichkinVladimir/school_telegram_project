@@ -208,10 +208,13 @@ def main():
     """
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    cfg.disable_logger(["httpcore.connection", "httpcore.http11"])
+    cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
     schedule = Schedule()
     schedule.parse(cfg.SCHEDULE_URL)
     print("----------------------------------------------")
     id_dict = {}
+    error_list = []
     for department in schedule.departments:
         department_id = department.id
         if department_id in id_dict:
@@ -220,6 +223,10 @@ def main():
             id_dict[department_id] = 1
         print(f"{department.name} {department_id}")
         for class_ in department.class_list:
+            week_schedule: WeekSchedule = class_.week_schedule
+            if not week_schedule.last_parse_result:
+                print(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
+                error_list.append(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
             class_id = class_.id
             if class_id in id_dict:
                 id_dict[class_id] = id_dict[class_id] + 1
@@ -231,6 +238,8 @@ def main():
     for key, value in id_dict.items():
         if value > 1:
             print(f"duplicate id {key}")
+    for error in error_list:
+        print(error)
 
 if __name__ == "__main__":
     main()

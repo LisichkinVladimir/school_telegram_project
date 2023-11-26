@@ -179,8 +179,27 @@ class WayOfWeek:
     """
     Вспомогательный класс предназначенный для поиска строи или столбцов дней недели
     """
-    short_week_names: list = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-    week_names: list = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
+    week_names: list = [
+        ['ПН','ПОНЕДЕЛЬНИК'],
+        ['ВТ', 'ВТОРНИК'],
+        ['СР', 'СРЕДА'],
+        ['ЧТ', 'ЧЕТВЕРГ'],
+        ['ПТ', 'ПЯТНИЦА'],
+        ['СБ', 'СУББОТА']
+    ]
+
+    def get_week_index(self, week_name: str)->int:
+        """
+        Получить индекс по названию дня недели
+        """
+        if week_name is None:
+            return None
+        week_name = week_name.upper()
+        for index, week in enumerate(self.week_names):
+            for name in week:
+                if name == week_name:
+                    return index
+        return None
 
     def __init__(self, tables: list):
         """
@@ -197,15 +216,10 @@ class WayOfWeek:
                 # Получение индексов дней недели
                 for i, row in enumerate(table):
                     for j, col in enumerate(row):
-                        index = self.week_names.index(col) if col in self.week_names else None
+                        index = self.get_week_index(col)
                         if index is not None:
-                            self.__week_indexes[self.week_names[index]] = (i, j)
+                            self.__week_indexes[col] = [i, j]
                             self.__has_week = True
-                        else:
-                            index = self.short_week_names.index(col) if col in self.short_week_names else None
-                            if index is not None:
-                                self.__week_indexes[self.short_week_names[index]] = (i, j)
-                                self.__has_week = True
                 if self.__has_week:
                     logging.info(f"week_indexes={self.__week_indexes}")
                     # Определение - дни недели по строкам или столбцам
@@ -217,12 +231,21 @@ class WayOfWeek:
                         if self.__column_index != value[1]:
                             self.__column_index = -1
 
-    def get_dey_of_week_by_row(self, row_index: int) -> str:
+    def get_day_of_week_by_row(self, row_index: int) -> str:
         """
         Поиск дня недели по индексу столбца
         """
         for key, value in self.__week_indexes.items():
-            if value[0] == row_index:
+            if value[1] == row_index:
+                return key
+        return None
+
+    def get_day_of_week_by_column(self, column_index) -> str:
+        """
+        Поиск дня недели по индексу строки
+        """
+        for key, value in self.__week_indexes.items():
+            if value[0] == column_index:
                 return key
         return None
 
@@ -264,6 +287,7 @@ class WeekSchedule:
         self.__created = None
         self.__hash: str = ""
         self.__last_parse_result = False
+        self.__last_parse_error = None
         self.__lesson_dict = {}
 
     def __parse_lesson(self, lesson: str, week, hour, day_of_week: str) -> None:
@@ -286,6 +310,13 @@ class WeekSchedule:
                 if match:
                     group = lesson[match.start():match.end()]
                     lesson = lesson.replace(group, "")
+        else:
+            if "1 группа" in lesson:
+                group = "1 группа"
+                lesson = lesson.replace("1 группа", "")
+            elif "2 группа" in lesson:
+                group = "2 группа"
+                lesson = lesson.replace("2 группа", "")
         # office
         office = None
         match = re.search(R"\d+\D{0,1}", lesson)
@@ -300,6 +331,8 @@ class WeekSchedule:
             lesson = lesson.replace(teacher, "").strip()
         name = lesson
         logging.info(f"day_of_week={day_of_week} lesson={name} group={group} office={office} teacher={teacher}")
+        if name == "":
+            return
         lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week)
         new_lesson = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, row_data = row_data)
         if lesson_ident not in self.__lesson_dict:
@@ -311,7 +344,7 @@ class WeekSchedule:
 
     def __parse_week_by_row(self, table: list, day_of_week: WayOfWeek) -> bool:
         """
-        Разбор расписания где дни недели по строкам к строке row_index
+        Разбор расписания где дни недели по строкам к строке day_of_week.row_index
         """
         first_column = next(iter(day_of_week.week_indexes.values()))[1]
         hour_index = first_column - 1
@@ -319,27 +352,51 @@ class WeekSchedule:
         if hour_index >= 1:
             week_index = hour_index - 1
         week = 1
+        hour_counter = 1
+        if hour_index == -1:
+            first_column = day_of_week.row_index + 1
         # Цикл по часам i - столбец
         for i in range(first_column, len(table)):
-            hour = int(table[i][hour_index])
-            if week_index is not None and table[i][week_index] is not None:
+            if 'Занятия по выбору' in table[i]:
+                return self.__last_parse_result
+            hour = None
+            if hour_index >=0:
+                # Поиск столбца с часами
+                if table[i][hour_index] is not None and table[i][hour_index].isnumeric():
+                    hour = int(table[i][hour_index])
+                elif hour_index >= 1:
+                    hour_index -= 1
+                    if table[i][hour_index] is not None and table[i][hour_index].isnumeric():
+                        hour = int(table[i][hour_index])
+                        if hour_index >= 1:
+                            week_index = hour_index - 1
+                        else:
+                            week_index = None
+            else:
+                # Столбца с часами нет - просто 1,2,....
+                hour = hour_counter
+                hour_counter += 1
+            if hour is None:
+                continue
+            if week_index is not None and table[i][week_index] is not None and table[i][week_index].isnumeric():
                 week = int(table[i][week_index])
             logging.info(f"week={week} hour={hour}")
             # Цикл по дням недели
             for j in range(hour_index + 1, len(table[i])):
-                day = day_of_week.get_dey_of_week_by_row(j)
-                if day is None:
-                    day = day_of_week.get_dey_of_week_by_row(j-1)
+                day = day_of_week.get_day_of_week_by_row(j)
+                if day is None and hour_index != -1:
+                    # Урок больше одного часа
+                    day = day_of_week.get_day_of_week_by_row(j-1)
                 if day:
                     lesson = table[i][j]
                     if lesson is not None and lesson != '':
                         # Есть урок
                         self.__parse_lesson(lesson, week, hour, day)
                         self.__last_parse_result = True
-                    elif i > 2 and table[i-1][j]:
-                        # lesson is None но предыдущий столбец есть
+                    elif i > 2 and table[i-1][j] and hour_index != -1:
+                        # lesson is None но предыдущий столбец есть - проверяем это не второй час урока
                         prev_row_data = table[i-1][j]
-                        lesson_ident: LessonIdent = LessonIdent(week, hour-1, day_of_week)
+                        lesson_ident: LessonIdent = LessonIdent(week, hour-1, day)
                         if lesson_ident in self.__lesson_dict:
                             lesson: Lesson = self.__lesson_dict[lesson_ident]
                             if lesson.row_data == prev_row_data:
@@ -348,6 +405,31 @@ class WeekSchedule:
                                 for group in lesson.groups:
                                     if group.row_data == prev_row_data:
                                         group.hour_end = hour
+        return self.__last_parse_result
+
+    def __parse_week_by_column(self, table: list, day_of_week: WayOfWeek) -> bool:
+        """
+        Разбор расписания где дни недели по столбцам к столбце day_of_week.column_index
+        """
+        week = 1
+        week_index = day_of_week.column_index - 1
+        first_row = next(iter(day_of_week.week_indexes.values()))[0]
+        for i in range(first_row, len(table)):
+            if week_index >= 0 and table[i][week_index] is not None and table[i][week_index].isnumeric():
+                week = int(table[i][week_index])
+            day = day_of_week.get_day_of_week_by_column(i)
+            if day is None:
+                # Урок разбит на две группы
+                day = day_of_week.get_day_of_week_by_column(i-1)
+            if day:
+                logging.info(f"week={week} day of week={day}")
+                for j in range(day_of_week.column_index + 1, len(table[i])):
+                    lesson = table[i][j]
+                    hour = table[first_row-1][j].replace("\n", " ")
+                    if lesson is not None and lesson != '':
+                        # Есть урок
+                        self.__parse_lesson(lesson, week, hour, day)
+                        self.__last_parse_result = True
         return self.__last_parse_result
 
     @timed_lru_cache(60*60*24)
@@ -359,7 +441,8 @@ class WeekSchedule:
         logging.info(f"get {self.__url}")
         response = requests.get(self.__url)
         if response.status_code != 200:
-            logging.error(f"Error get {self.__url}. error code {response.status_code}")
+            self.__last_parse_error = f"Error get {self.__url}. error code {response.status_code}"
+            logging.error(self.__last_parse_error)
             return False
 
         # Вычисление хэша
@@ -374,13 +457,15 @@ class WeekSchedule:
         self.__department = None
         self.__created = None
         self.__last_parse_result = False
+        self.__last_parse_error = None
 
         mem_obj = io.BytesIO(response.content)
         pdfReader = PdfReader(mem_obj)
         # printing number of pages in pdf file
         pages = len(pdfReader.pages)
         if pages == 0:
-            logging.error("Error parse pdf. Zero page number")
+            self.__last_parse_error = "Ошибка разбора pdf. Нулевое количество страниц"
+            logging.error(self.__last_parse_error)
             return False
         logging.info(f"Pdf pages {pages}")
         # extract page structure
@@ -409,7 +494,7 @@ class WeekSchedule:
                             self.__created = datetime.strptime(s[match.start():match.end()], "%d.%m.%Y")
         logging.info(f"class={self.__class_name} department={self.__department} created={self.__created}")
 
-        # extract table
+        # Разбор таблицы
         pdf = pdfplumber.open(mem_obj)
         for page_num in range(0, pages):
             table_page = pdf.pages[page_num]
@@ -424,69 +509,11 @@ class WeekSchedule:
                             return self.__parse_week_by_row(table, day_of_wek)
                         elif day_of_wek.column_index >= 0 and day_of_wek.row_index == -1:
                             logging.info(f"week indexes by column {day_of_wek.column_index}")
-                        else:
-                            logging.error("Can not find day of week in table")
-                            return False
-
-                    """
-
-                if has_week == week_location.ROW:
-                    # Дни недели в строке
-                    logging.info(f"week on row indexes {week_indexes}")
-                    hour_index = week_indexes[0] - 1
-                    week_index = None
-                    if hour_index >= 1:
-                        week_index = hour_index - 1
-                    week = 1
-                    # Цикл по часам i - столбец
-                    for i in range(2, len(table)):
-                        hour = int(table[i][hour_index])
-                        if week_index is not None and table[i][week_index] is not None:
-                            week = int(table[i][week_index])
-                        logging.info(f"week={week} hour={hour}")
-                        # Цикл по дням недели j - строчка
-                        for j in range(hour_index + 1, len(table[i])):
-                            day_of_week = None
-                            index = week_indexes.index(j) if j in week_indexes else None
-                            if index is not None:
-                                day_of_week = week_names[index]
-                            else:
-                                index = week_indexes.index(j - 1) if j - 1 in week_indexes else None
-                                if index is not None:
-                                    day_of_week = week_names[index]
-                            if day_of_week:
-                                lesson = table[i][j]
-                                if lesson is not None and lesson != '':
-                                    # Есть урок
-                                    self.__parse_lesson(lesson, week, hour, day_of_week)
-                                    self.__last_parse_result = True
-                                elif i > 2 and table[i-1][j]:
-                                    # lesson is None но предыдущий столбец есть
-                                    prev_row_data = table[i-1][j]
-                                    lesson_ident: LessonIdent = LessonIdent(week, hour-1, day_of_week)
-                                    if lesson_ident in self.__lesson_dict:
-                                        lesson: Lesson = self.__lesson_dict[lesson_ident]
-                                        if lesson.row_data == prev_row_data:
-                                            lesson.hour_end = hour
-                                        elif len(lesson.groups) > 0:
-                                            for group in lesson.groups:
-                                                if group.row_data == prev_row_data:
-                                                    group.hour_end = hour
-                elif len(table)>1:
-                    # Дни недели в столбце
-                    logging.info("week on column")
-                    # Получение индексов дней недели
-                    for j in range(2, len(table)):
-                        week = table[j][0]
-                        i = week_names.index(week) if week in week_names else None
-                        if i is not None:
-                            week_indexes[i] = j
-                            has_week_column = True
-                    logging.info(f"week on row column {week_indexes}")
-                    if has_week_column:
-                        # TODO
-                        pass
-        """
+                            return self.__parse_week_by_column(table, day_of_wek)
+                    else:
+                        self.__last_parse_error = "Не возможно найти в таблице дни недели"
+                        logging.error(self.__last_parse_error)
+                        return False
         return self.__last_parse_result
 
     def week_list(self) -> list:
@@ -544,6 +571,14 @@ class WeekSchedule:
         """ Был ли разбор успешен """
         return self.__last_parse_result
 
+    @property
+    def last_parse_error(self) -> str:
+        """ Ошибка разбора """
+        if self.__last_parse_error:
+            return self.__last_parse_error
+        else:
+            return "Ошибка разбора pdf страницы"
+
 def main():
     """
     Разбора pdf расписания класса
@@ -551,8 +586,13 @@ def main():
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
-    url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
+    #url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/delta3/2%D0%BE.pdf"
+    #url = "https://1502.mskobr.ru//files/rasp/beta/1А.pdf"
+    #url = "https://1502.mskobr.ru//files/rasp/beta/1Б.pdf"
+    #url = "https://1502.mskobr.ru//files/rasp/beta/2А.pdf"
+    #url = 'https://1502.mskobr.ru//files/rasp/beta/2Б.pdf'
+    url = 'https://1502.mskobr.ru//files/rasp/gamma/7Л.pdf'
     week_schedule = WeekSchedule(url)
     week_schedule.parse()
     print("----------------------------------------------")
