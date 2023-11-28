@@ -53,10 +53,8 @@ def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAU
     if error_message:
         return None, error_message
     keyboard = []
-    index = 0
     for department in schedule.departments:
-        button = [InlineKeyboardButton(department.name, callback_data=MenuData(index).to_string("DEPARTMENT"))]
-        index += 1
+        button = [InlineKeyboardButton(department.name, callback_data=MenuData(department.id).to_string("DEPARTMENT"))]
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string("DEPARTMENT"))])
     return InlineKeyboardMarkup(keyboard), None
@@ -86,10 +84,8 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
         return None, error_message
 
     keyboard = []
-    index = 0
     for class_ in department.class_list:
-        button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.department, index).to_string("CLASS"))]
-        index += 1
+        button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.department, class_.id).to_string("CLASS"))]
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string("CLASS"))])
     return InlineKeyboardMarkup(keyboard), None
@@ -125,10 +121,8 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
         return None, error_message
 
     keyboard = []
-    index = 0
-    for week_day in day_of_week_list:
+    for index, week_day in enumerate(day_of_week_list):
         button = [InlineKeyboardButton(week_day, callback_data=MenuData(menu_data.department, menu_data.class_, menu_data.week, index).to_string("DAY_OF_WEEK"))]
-        index += 1
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string("DAY_OF_WEEK"))])
     return InlineKeyboardMarkup(keyboard), None
@@ -142,13 +136,11 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
         return None, error_message
 
     if len(week_list) == 1:
-        return keyboard_button_day_of_week(MenuData(menu_data.department, menu_data.class_, 0), context)
+        return keyboard_button_day_of_week(MenuData(menu_data.department, menu_data.class_, 1), context)
     elif len(week_list) > 1:
-        index = 0
         keyboard = []
         for week in week_list:
-            button = [InlineKeyboardButton(f"Неделя месяца {week}", callback_data=MenuData(menu_data.department, menu_data.class_, index).to_string("WEEK"))]
-            index += 1
+            button = [InlineKeyboardButton(f"Неделя месяца {week}", callback_data=MenuData(menu_data.department, menu_data.class_, week).to_string("WEEK"))]
             keyboard.append(button)
         keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, -1).to_string("WEEK"))])
         return InlineKeyboardMarkup(keyboard), None
@@ -233,7 +225,7 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             await query.edit_message_text(error_message)
             return START_ROUTES
         message = f"Расписание для класса {week_schedule.class_name}/{week_schedule.department}\n{week_schedule.url}\n"
-        day_of_week_list = week_schedule.day_of_week_list(menu_data.week + 1)
+        day_of_week_list = week_schedule.day_of_week_list(menu_data.week)
         message = f"{message}\n{day_of_week_list[menu_data.day_of_week]}:\n"
         for lesson in lessons:
             lesson_string = lesson.to_str(parse_mode = ParseMode.HTML)

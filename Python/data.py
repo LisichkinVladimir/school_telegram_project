@@ -129,18 +129,18 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     if class_name == "DEPARTMENT":
         return schedule, None
 
-    department_index = menu_data.department
-    if department_index < 0 or department_index > len(schedule.departments)-1:
-        return None, "Индекс корпуса не корректен"
+    department_id = menu_data.department
+    department: Department = schedule.get_department_by_id(department_id)
+    if department is None:
+        return None, "Идентификатор корпуса не корректен"
     if class_name == "CLASS":
-        return schedule.departments[department_index], None
+        return department, None
 
-    class_index = menu_data.class_
-    department: Department = schedule.departments[department_index]
-    if class_index < 0 or class_index > len(department.class_list)-1:
-        return None, "Индекс класса не корректен"
+    class_id = menu_data.class_
+    school_class: SchoolClass = department.get_class_by_id(class_id)
+    if school_class is None:
+        return None, "Идентификатор класса не корректен"
 
-    school_class: SchoolClass = department.class_list[class_index]
     # Разбор pdf файла недельного расписания
     week_schedule: WeekSchedule = school_class.week_schedule
     if week_schedule is None:
@@ -153,10 +153,7 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
     if class_name == "WEEK":
         return week_list, None
 
-    week_index = menu_data.week
-    if week_index < 0 or week_index > len(week_list)-1:
-        return None, "Индекс недели не корректен"
-    day_of_week_list = week_schedule.day_of_week_list(week_index + 1)
+    day_of_week_list = week_schedule.day_of_week_list(menu_data.week)
     if day_of_week_list is None:
         return None, "Список дней недели не определен"
     if class_name == "DAY_OF_WEEK":
@@ -167,7 +164,7 @@ def get_schedule_object(class_name: str, menu_data: MenuData, context: ContextTy
         return None, "Индекс дня недели не корректен"
     day_of_week = day_of_week_list[day_of_week_index]
     if class_name == "LESSONS":
-        return week_schedule.lesson_list(week_index + 1, day_of_week), None
+        return week_schedule.lesson_list(menu_data.week, day_of_week), None
 
     return None, "Не известный тип объекта"
 

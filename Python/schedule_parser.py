@@ -109,6 +109,13 @@ class Department:
         """ уникальный идентификатор """
         return self.__id
 
+    def get_class_by_id(self, class_id: int) -> SchoolClass:
+        """ Получить класс по идентификатору"""
+        for class_ in self.__classes:
+            if class_.id == class_id:
+                return class_
+        return None
+
     def __hash__(self) -> int:
         """ Вычисление хеша """
         return hash_string_to_byte(self.__name)
@@ -197,6 +204,13 @@ class Schedule:
             return departments_list
         else:
             return self.__departments
+
+    def get_department_by_id(self, department_id: int) -> Department:
+        """ Поиск территории по идентификатору """
+        for department in self.__departments:
+            if department.id == department_id:
+                return department
+        return None
 
     def hash(self) -> str:
         """ Свойство возвращающее hash расписания """
