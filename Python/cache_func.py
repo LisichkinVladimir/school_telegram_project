@@ -28,12 +28,22 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
 
 def hash_string_to_byte(s: str) -> int:
     """
-    Хеширование строки в три байта
+    Хеширование строки в байт
     """
     byte_array = bytes(s, encoding='utf-8')
     result: int = 5381
     for byte in byte_array:
         result = (((result << 5) + result) + byte) & 0xFFFF
+    return result
+
+def hash_string(s: str) -> int:
+    """
+    Хеширование строки в два байта
+    """
+    byte_array = bytes(s, encoding='utf-8')
+    result: int = 5381
+    for byte in byte_array:
+        result = (((result << 5) + result) + byte) & 0xFFFFFFFF
     return result
 
 def main():

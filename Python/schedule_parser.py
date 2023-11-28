@@ -57,7 +57,7 @@ class SchoolClass:
         """" Свойство расписание на неделю """
         if self.__week_schedule is None:
             self.__week_schedule = WeekSchedule(cfg.BASE_URL + "/" + self.__link)
-        self.__week_schedule.parse()
+        self.__week_schedule.parse(self.__department.name)
         return self.__week_schedule
 
     @property
@@ -218,26 +218,39 @@ def main():
     for department in schedule.departments:
         department_id = department.id
         if department_id in id_dict:
-            id_dict[department_id] = id_dict[department_id] + 1
+            id_dict[department_id] += 1
         else:
             id_dict[department_id] = 1
         print(f"{department.name} {department_id}")
         for class_ in department.class_list:
+            class_id = class_.id
+            if class_id in id_dict:
+                id_dict[class_id] += 1
+            else:
+                id_dict[class_id] = 1
+            print(f"{class_.name}/[{class_id}];", end="")
             week_schedule: WeekSchedule = class_.week_schedule
             if not week_schedule.last_parse_result:
                 print(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
                 error_list.append(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
-            class_id = class_.id
-            if class_id in id_dict:
-                id_dict[class_id] = id_dict[class_id] + 1
             else:
-                id_dict[class_id] = 1
-            print(f"{class_.name}/[{class_id}];", end="")
+                for week in week_schedule.week_list():
+                    for day_of_week in week_schedule.day_of_week_list(week):
+                        print(f"week-{week} day_of_week-{day_of_week}")
+                        for lesson in week_schedule.lesson_list(week, day_of_week):
+                            lesson_id = lesson.id
+                            if lesson_id in id_dict:
+                                id_dict[lesson_id] += 1
+                            else:
+                                id_dict[lesson_id] = 1
+                            lesson_string = "[" + str(lesson_id) + "]" + lesson.to_str()
+                            print(lesson_string)
         print("\n")
-    print("----------------------------------------------")
+    print("------------------duplicate--------------------------")
     for key, value in id_dict.items():
         if value > 1:
             print(f"duplicate id {key}")
+    print("-----------------error parse--------------------------")
     for error in error_list:
         print(error)
 

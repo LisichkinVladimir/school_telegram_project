@@ -11,10 +11,10 @@ from urllib.parse import unquote
 import requests
 from PyPDF2 import PdfReader
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTTextContainer, LTPage
+from pdfminer.layout import LTTextContainer, LTPage, LTFigure
 from telegram.constants import ParseMode
 import pdfplumber
-from cache_func import timed_lru_cache, hash_string_to_byte
+from cache_func import timed_lru_cache, hash_string
 import config as cfg
 
 class LessonIdent:
@@ -36,7 +36,7 @@ class LessonIdent:
 
     def __hash__(self) -> int:
         """ Вычисление хеша """
-        return hash_string_to_byte(f"{self.__week}_{self.__hour_start}_{self.__day_of_week}")
+        return hash_string(f"{self.__week}_{self.__hour_start}_{self.__day_of_week}")
 
     def __eq__(self, other) -> bool:
         """ Функция сравнения """
@@ -72,7 +72,7 @@ class Lesson:
     PRINT_TEACHER = 8
     PRINT_ALL: set = {PRINT_HOURS, PRINT_OFFICE, PRINT_GROUP, PRINT_TEACHER}
 
-    def __init__(self, ident: LessonIdent, name: str, office: str, group: str, teacher: str, row_data: str = None):
+    def __init__(self, ident: LessonIdent, name: str, office: str, group: str, teacher: str, class_name: str, row_data: str):
         """
         Конструктор класса
         ident: идентификатор урока (неделя/день недели/час)
@@ -87,9 +87,10 @@ class Lesson:
         self.__office: str = office
         self.__group: str = group
         self.__teacher: str = teacher
+        self.__class_name: str = class_name
         self.__row_data: str = row_data
         self.__groups: list = []
-        self.__id: int = hash_string_to_byte(f"{self.__name}_{self.ident.week}_{self.ident.hour_start}_{self.ident.day_of_week}")
+        self.__id: int = hash_string(f"{self.__name}_{self.ident.week}_{self.ident.hour_start}_{self.ident.day_of_week}_{self.__office}_{self.__group}_{self.__teacher}_{self.__class_name}")
 
     @property
     def ident(self) -> LessonIdent:
@@ -124,6 +125,11 @@ class Lesson:
     def teacher(self) -> str:
         """" Свойство преподаватель """
         return self.__teacher
+
+    @property
+    def class_name(self) -> str:
+        """ Название класса """
+        return self.__class_name
 
     @property
     def row_data(self) -> str:
@@ -177,7 +183,7 @@ class Lesson:
 
 class WayOfWeek:
     """
-    Вспомогательный класс предназначенный для поиска строи или столбцов дней недели
+    Вспомогательный класс предназначенный для поиска строки или столбцов дней недели
     """
     week_names: list = [
         ['ПН','ПОНЕДЕЛЬНИК'],
@@ -334,7 +340,7 @@ class WeekSchedule:
         if name == "":
             return
         lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week)
-        new_lesson = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, row_data = row_data)
+        new_lesson = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, class_name = self.__class_name, row_data = row_data)
         if lesson_ident not in self.__lesson_dict:
             self.__lesson_dict[lesson_ident] = new_lesson
         else:
@@ -433,7 +439,7 @@ class WeekSchedule:
         return self.__last_parse_result
 
     @timed_lru_cache(60*60*24)
-    def parse(self) -> bool:
+    def parse(self, department_name: str = None) -> bool:
         """
         Процедура разбора url расписания
         """
@@ -492,6 +498,11 @@ class WeekSchedule:
                         match = re.search(R"\d{1,2}\.\d{1,2}\.\d{4}", s)
                         if match:
                             self.__created = datetime.strptime(s[match.start():match.end()], "%d.%m.%Y")
+                elif isinstance(element, LTFigure):
+                    self.__last_parse_error = "PDF содержит сканированное изображение - распознавание не возможно"
+                    logging.warning(self.__last_parse_error)
+        if self.__department is None and department_name is not None:
+            self.__department = department_name
         logging.info(f"class={self.__class_name} department={self.__department} created={self.__created}")
 
         # Разбор таблицы
@@ -506,10 +517,16 @@ class WeekSchedule:
                     if day_of_wek.has_week:
                         if day_of_wek.row_index >= 0 and day_of_wek.column_index == -1:
                             logging.info(f"week indexes by row {day_of_wek.row_index}")
-                            return self.__parse_week_by_row(table, day_of_wek)
+                            result = self.__parse_week_by_row(table, day_of_wek)
+                            if result:
+                                self.__last_parse_error = None
+                            return result
                         elif day_of_wek.column_index >= 0 and day_of_wek.row_index == -1:
                             logging.info(f"week indexes by column {day_of_wek.column_index}")
-                            return self.__parse_week_by_column(table, day_of_wek)
+                            result = self.__parse_week_by_column(table, day_of_wek)
+                            if result:
+                                self.__last_parse_error = None
+                            return result
                     else:
                         self.__last_parse_error = "Не возможно найти в таблице дни недели"
                         logging.error(self.__last_parse_error)
