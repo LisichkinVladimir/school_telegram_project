@@ -279,7 +279,7 @@ class WeekSchedule:
     """
     Расписание класса на неделю/две недели
     """
-    def __init__(self, url: str):
+    def __init__(self, school_class = None):
         """
         Конструктор класса
         class_name: название класса
@@ -287,16 +287,14 @@ class WeekSchedule:
         url: url pdf файла
         created: str: дата создания
         """
-        self.__class_name: str = None
-        self.__department: str = None
-        self.__url: str = url
+        self.__school_class = school_class
         self.__created = None
         self.__hash: str = ""
         self.__last_parse_result = False
         self.__last_parse_error = None
         self.__lesson_dict = {}
 
-    def __parse_lesson(self, lesson: str, week, hour, day_of_week: str) -> None:
+    def __parse_lesson(self, lesson: str, week, hour, day_of_week: str, class_name: str = None) -> None:
         """
         Разобрать lesson - достать name/office/group
         """
@@ -304,14 +302,16 @@ class WeekSchedule:
         lesson = lesson.replace("\n", " ")
         # group
         group = None
-        if self.__class_name in lesson:
-            s = self.__class_name + R".\d{1}"
+        if self.__school_class is not None:
+            class_name = self.__school_class.name
+        if class_name is not None and class_name in lesson:
+            s = class_name + R".\d{1}"
             match = re.search(RF"{s}", lesson)
             if match:
                 group = lesson[match.start():match.end()]
                 lesson = lesson.replace(group, "")
             else:
-                s = self.__class_name + R"\d{1}"
+                s = class_name + R"\d{1}"
                 match = re.search(RF"{s}", lesson)
                 if match:
                     group = lesson[match.start():match.end()]
@@ -340,7 +340,14 @@ class WeekSchedule:
         if name == "":
             return
         lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week)
-        new_lesson = Lesson(ident = lesson_ident, name = name, office = office, group = group, teacher = teacher, class_name = self.__class_name, row_data = row_data)
+        new_lesson = Lesson(
+            ident = lesson_ident,
+            name = name,
+            office = office,
+            group = group,
+            teacher = teacher,
+            class_name = None if self.__school_class is None else self.__school_class.name,
+            row_data = row_data)
         if lesson_ident not in self.__lesson_dict:
             self.__lesson_dict[lesson_ident] = new_lesson
         else:
@@ -348,7 +355,7 @@ class WeekSchedule:
             lesson: Lesson = self.__lesson_dict[lesson_ident]
             lesson.groups.append(new_lesson)
 
-    def __parse_week_by_row(self, table: list, day_of_week: WayOfWeek) -> bool:
+    def __parse_week_by_row(self, table: list, day_of_week: WayOfWeek, class_name: str = None) -> bool:
         """
         Разбор расписания где дни недели по строкам к строке day_of_week.row_index
         """
@@ -397,7 +404,7 @@ class WeekSchedule:
                     lesson = table[i][j]
                     if lesson is not None and lesson != '':
                         # Есть урок
-                        self.__parse_lesson(lesson, week, hour, day)
+                        self.__parse_lesson(lesson, week, hour, day, class_name)
                         self.__last_parse_result = True
                     elif i > 2 and table[i-1][j] and hour_index != -1:
                         # lesson is None но предыдущий столбец есть - проверяем это не второй час урока
@@ -413,7 +420,7 @@ class WeekSchedule:
                                         group.hour_end = hour
         return self.__last_parse_result
 
-    def __parse_week_by_column(self, table: list, day_of_week: WayOfWeek) -> bool:
+    def __parse_week_by_column(self, table: list, day_of_week: WayOfWeek, class_name: str = None) -> bool:
         """
         Разбор расписания где дни недели по столбцам к столбце day_of_week.column_index
         """
@@ -434,20 +441,22 @@ class WeekSchedule:
                     hour = table[first_row-1][j].replace("\n", " ")
                     if lesson is not None and lesson != '':
                         # Есть урок
-                        self.__parse_lesson(lesson, week, hour, day)
+                        self.__parse_lesson(lesson, week, hour, day, class_name)
                         self.__last_parse_result = True
         return self.__last_parse_result
 
     @timed_lru_cache(60*60*24)
-    def parse(self, department_name: str = None) -> bool:
+    def parse(self, url = None) -> bool:
         """
         Процедура разбора url расписания
         """
         # Получение html из Web
-        logging.info(f"get {self.__url}")
-        response = requests.get(self.__url)
+        if self.__school_class is not None:
+            url = self.__school_class.link
+        logging.info(f"get {url}")
+        response = requests.get(url)
         if response.status_code != 200:
-            self.__last_parse_error = f"Error get {self.__url}. error code {response.status_code}"
+            self.__last_parse_error = f"Error get {url}. error code {url}"
             logging.error(self.__last_parse_error)
             return False
 
@@ -459,8 +468,6 @@ class WeekSchedule:
 
         self.__hash = new_hash
         self.__lesson_dict = {}
-        self.__class_name = None
-        self.__department = None
         self.__created = None
         self.__last_parse_result = False
         self.__last_parse_error = None
@@ -478,9 +485,12 @@ class WeekSchedule:
         layouts = extract_pages(mem_obj)
         pages_num = 0
         element_num = 0
-        self.__class_name = self.__url[self.__url.rfind('/') + 1:]
-        self.__class_name = unquote(self.__class_name)
-        self.__class_name = self.__class_name.replace(".pdf", "")
+        if self.__school_class is not None:
+            class_name = self.__school_class.name
+        else:
+            class_name = url[url.rfind('/') + 1:]
+            class_name = unquote(class_name)
+            class_name = class_name.replace(".pdf", "")
         for page_layout in layouts:
             if isinstance(page_layout, LTPage):
                 pages_num += 1
@@ -489,11 +499,6 @@ class WeekSchedule:
                 element_num += 1
                 if isinstance(element, LTTextContainer):
                     s = element.get_text()
-                    if pages_num == 1 and element_num in [1, 2] and ("Школа №1502" in s or "Школа № 1502" in s):
-                        self.__department = s
-                        self.__department = self.__department.replace('ГБОУ "Школа №1502",', '').strip()
-                        self.__department = self.__department.replace('ГБОУ "Школа № 1502",', '').strip()
-                        self.__department = self.__department.replace('при МЭИ', '').strip()
                     if s.find("Составлено:") >= 0:
                         match = re.search(R"\d{1,2}\.\d{1,2}\.\d{4}", s)
                         if match:
@@ -501,9 +506,7 @@ class WeekSchedule:
                 elif isinstance(element, LTFigure):
                     self.__last_parse_error = "PDF содержит сканированное изображение - распознавание не возможно"
                     logging.warning(self.__last_parse_error)
-        if self.__department is None and department_name is not None:
-            self.__department = department_name
-        logging.info(f"class={self.__class_name} department={self.__department} created={self.__created}")
+        logging.info(f"class={class_name} created={self.__created}")
 
         # Разбор таблицы
         pdf = pdfplumber.open(mem_obj)
@@ -517,13 +520,13 @@ class WeekSchedule:
                     if day_of_wek.has_week:
                         if day_of_wek.row_index >= 0 and day_of_wek.column_index == -1:
                             logging.info(f"week indexes by row {day_of_wek.row_index}")
-                            result = self.__parse_week_by_row(table, day_of_wek)
+                            result = self.__parse_week_by_row(table, day_of_wek, class_name)
                             if result:
                                 self.__last_parse_error = None
                             return result
                         elif day_of_wek.column_index >= 0 and day_of_wek.row_index == -1:
                             logging.info(f"week indexes by column {day_of_wek.column_index}")
-                            result = self.__parse_week_by_column(table, day_of_wek)
+                            result = self.__parse_week_by_column(table, day_of_wek, class_name)
                             if result:
                                 self.__last_parse_error = None
                             return result
@@ -569,19 +572,9 @@ class WeekSchedule:
         return self.__hash
 
     @property
-    def department(self) -> str:
-        """ Свойство корпус """
-        return self.__department
-
-    @property
-    def class_name(self) -> str:
-        """ Свойство имя класса """
-        return self.__class_name
-
-    @property
-    def url(self) -> str:
-        """ Свойство url pdf файла """
-        return self.__url
+    def school_class(self):
+        """ Свойство school_class """
+        return self.__school_class
 
     @property
     def last_parse_result(self) -> bool:
@@ -603,15 +596,15 @@ def main():
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
-    #url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
+    url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/delta3/2%D0%BE.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/beta/1А.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/beta/1Б.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/beta/2А.pdf"
     #url = 'https://1502.mskobr.ru//files/rasp/beta/2Б.pdf'
-    url = 'https://1502.mskobr.ru//files/rasp/gamma/7Л.pdf'
-    week_schedule = WeekSchedule(url)
-    week_schedule.parse()
+    #url = 'https://1502.mskobr.ru//files/rasp/gamma/7Л.pdf'
+    week_schedule = WeekSchedule()
+    week_schedule.parse(url)
     print("----------------------------------------------")
     for week in week_schedule.week_list():
         for day_of_week in week_schedule.day_of_week_list(week):

@@ -29,7 +29,10 @@ class SchoolClass:
         if match and name[:match.end()].isnumeric():
             self.__number = int(name[:match.end()])
         # url с расписанием класса на неделю
-        self.__link: str = link
+        if link is None or cfg.BASE_URL in link:
+            self.__link: str = link
+        else:
+            self.__link: str = cfg.BASE_URL + "/" + link
         # корпус
         self.__department = department
         # расписание на неделю
@@ -56,8 +59,8 @@ class SchoolClass:
     def week_schedule(self) -> WeekSchedule:
         """" Свойство расписание на неделю """
         if self.__week_schedule is None:
-            self.__week_schedule = WeekSchedule(cfg.BASE_URL + "/" + self.__link)
-        self.__week_schedule.parse(self.__department.name)
+            self.__week_schedule = WeekSchedule(self)
+        self.__week_schedule.parse()
         return self.__week_schedule
 
     @property
@@ -245,8 +248,8 @@ def main():
             print(f"{class_.name}/[{class_id}];", end="")
             week_schedule: WeekSchedule = class_.week_schedule
             if not week_schedule.last_parse_result:
-                print(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
-                error_list.append(f"!!!!!!!! Ошибка разбора {week_schedule.url} - {week_schedule.last_parse_error}")
+                print(f"!!!!!!!! Ошибка разбора {class_.link} - {week_schedule.last_parse_error}")
+                error_list.append(f"!!!!!!!! Ошибка разбора {class_.link} - {week_schedule.last_parse_error}")
             else:
                 for week in week_schedule.week_list():
                     for day_of_week in week_schedule.day_of_week_list(week):
