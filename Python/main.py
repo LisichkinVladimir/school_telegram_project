@@ -8,6 +8,8 @@ from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandl
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 import config as cfg
+from schedule_parser import Schedule, Department, SchoolClass
+from week_pdf_parser import Lesson, WeekSchedule
 from data import MenuData, create_schedule, get_schedule_object
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
@@ -36,7 +38,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     user: User = update.effective_user
     logging.info(f"command start for {user.id}")
-    reply_markup = keyboard_button_schedule()
+    reply_markup: InlineKeyboardMarkup = keyboard_button_schedule()
     create_schedule(context)
 
     await update.message.reply_text(
@@ -45,14 +47,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return START_ROUTES
 
-def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> any:
     """
     Добавление кнопок корпусов
     """
+    schedule: Schedule
     schedule, error_message = get_schedule_object("DEPARTMENT", menu_data, context)
     if error_message:
         return None, error_message
     keyboard = []
+    department: Department
     for department in schedule.departments:
         button = [InlineKeyboardButton(department.name, callback_data=MenuData(department.id).to_string("DEPARTMENT"))]
         keyboard.append(button)
@@ -79,11 +83,13 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
     """
     Получение списка классов для корпуса department_index
     """
+    department: Department
     department, error_message = get_schedule_object("CLASS", menu_data, context)
     if error_message:
         return None, error_message
 
     keyboard = []
+    class_: SchoolClass
     for class_ in department.class_list:
         button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.department, class_.id).to_string("CLASS"))]
         keyboard.append(button)
@@ -116,6 +122,7 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
     """
     Получение списка дней недели для MenuData
     """
+    day_of_week_list: list
     day_of_week_list, error_message = get_schedule_object("DAY_OF_WEEK", menu_data, context)
     if error_message:
         return None, error_message
@@ -131,6 +138,7 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
     """
     Получение списка недель месяца для MenuData
     """
+    week_list: list
     week_list, error_message = get_schedule_object("WEEK", menu_data, context)
     if error_message:
         return None, error_message
@@ -216,10 +224,12 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return START_ROUTES
     else:
         # Отобразить расписание
+        lessons: Lesson
         lessons, error_message = get_schedule_object("LESSONS", menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
+        week_schedule: WeekSchedule
         week_schedule, error_message = get_schedule_object("WEEK_SCHEDULE", menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
@@ -227,6 +237,7 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         message = f"Расписание для класса {week_schedule.school_class.name}/{week_schedule.school_class.department.name}\n{week_schedule.school_class.link}\n"
         day_of_week_list = week_schedule.day_of_week_list(menu_data.week)
         message = f"{message}\n{day_of_week_list[menu_data.day_of_week]}:\n"
+        lesson: Lesson
         for lesson in lessons:
             lesson_string = lesson.to_str(parse_mode = ParseMode.HTML)
             message += f"{lesson_string}\n"

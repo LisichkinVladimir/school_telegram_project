@@ -8,7 +8,7 @@ from hashlib import md5
 import requests
 from bs4 import BeautifulSoup
 import config as cfg
-from week_pdf_parser import WeekSchedule
+from week_pdf_parser import WeekSchedule, Lesson
 from cache_func import timed_lru_cache, hash_string_to_byte
 
 class SchoolClass:
@@ -114,6 +114,7 @@ class Department:
 
     def get_class_by_id(self, class_id: int) -> SchoolClass:
         """ Получить класс по идентификатору"""
+        class_: SchoolClass
         for class_ in self.__classes:
             if class_.id == class_id:
                 return class_
@@ -201,6 +202,7 @@ class Schedule:
         """ Свойство возвращающее список территорий """
         if has_classes:
             departments_list = []
+            department: Department
             for department in self.__departments:
                 if len(department.class_list) > 0:
                     departments_list.append(department)
@@ -210,6 +212,7 @@ class Schedule:
 
     def get_department_by_id(self, department_id: int) -> Department:
         """ Поиск территории по идентификатору """
+        department: Department
         for department in self.__departments:
             if department.id == department_id:
                 return department
@@ -232,6 +235,7 @@ def main():
     print("----------------------------------------------")
     id_dict = {}
     error_list = []
+    department: Department
     for department in schedule.departments:
         department_id = department.id
         if department_id in id_dict:
@@ -239,6 +243,7 @@ def main():
         else:
             id_dict[department_id] = 1
         print(f"{department.name} {department_id}")
+        class_: SchoolClass
         for class_ in department.class_list:
             class_id = class_.id
             if class_id in id_dict:
@@ -254,6 +259,7 @@ def main():
                 for week in week_schedule.week_list():
                     for day_of_week in week_schedule.day_of_week_list(week):
                         print(f"week-{week} day_of_week-{day_of_week}")
+                        lesson: Lesson
                         for lesson in week_schedule.lesson_list(week, day_of_week):
                             lesson_id = lesson.id
                             if lesson_id in id_dict:
