@@ -171,6 +171,7 @@ class Lesson:
         if self.PRINT_TEACHER in what_to_print and self.teacher:
             result = f"{result} {self.teacher}"
         if len(self.groups) > 0:
+            group_item: Lesson
             for group_item in self.groups:
                 result = f"{result} // {group_item.name}"
                 if self.PRINT_OFFICE in what_to_print and group_item.office:
@@ -370,8 +371,6 @@ class WeekSchedule:
             first_column = day_of_week.row_index + 1
         # Цикл по часам i - столбец
         for i in range(first_column, len(table)):
-            if 'Занятия по выбору' in table[i]:
-                return self.__last_parse_result
             hour = None
             if hour_index >=0:
                 # Поиск столбца с часами
@@ -415,6 +414,7 @@ class WeekSchedule:
                             if lesson.row_data == prev_row_data:
                                 lesson.hour_end = hour
                             elif len(lesson.groups) > 0:
+                                group: Lesson
                                 for group in lesson.groups:
                                     if group.row_data == prev_row_data:
                                         group.hour_end = hour
@@ -541,6 +541,7 @@ class WeekSchedule:
         Список чередования по неделям
         """
         result = []
+        key: LessonIdent
         for key in self.__lesson_dict:
             if key.week not in result:
                 result.append(key.week)
@@ -551,6 +552,7 @@ class WeekSchedule:
         Список учебных дней недели
         """
         result = []
+        key: LessonIdent
         for key in self.__lesson_dict:
             if key.week == week and key.day_of_week not in result:
                 result.append(key.day_of_week)
@@ -561,6 +563,7 @@ class WeekSchedule:
         Список уроков дня
         """
         result = []
+        key: LessonIdent
         for key, value in self.__lesson_dict.items():
             if key.week == week and key.day_of_week == day_of_week:
                 result.append(value)
@@ -609,6 +612,7 @@ def main():
     for week in week_schedule.week_list():
         for day_of_week in week_schedule.day_of_week_list(week):
             print(f"week-{week} day_of_week-{day_of_week}")
+            lesson: Lesson
             for lesson in week_schedule.lesson_list(week, day_of_week):
                 lesson_string = "[" + str(lesson.id) + "]" + lesson.to_str()
                 print(lesson_string)
