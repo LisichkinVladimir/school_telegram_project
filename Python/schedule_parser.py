@@ -124,28 +124,34 @@ class Department:
         """ Вычисление хеша """
         return hash_string_to_byte(self.__name)
 
-class Schedule:
+class School:
     """
-    Класс расписание
+    Класс школа
     """
-    def __init__(self):
+    def __init__(self, url: str):
         """
         Конструктор класса
         """
+        # Название школы
+        self.__name: str = None
+        # url страницы школы
+        self.__url: str = url
         # список корпусов
         self.__departments: list = []
         # хэш последнего разбора расписания
-        self.__hash: str  = ""
+        self.__hash: str = ""
+        # идентификатор
+        self.__id: int = None
 
     @timed_lru_cache(60*60*24)
-    def parse(self, url: str) -> bool:
+    def parse(self) -> bool:
         """
         Процедура разбора url расписания
         """
         # Получение html из Web
-        response = requests.get(url)
+        response = requests.get(self.__url)
         if response.status_code != 200:
-            logging.error(f"Error get {url}. error code {response.status_code}")
+            logging.error(f"Error get {self.__url}. error code {response.status_code}")
             return False
         data = response.text
         logging.info(f"get {data[:25]}...\n")
@@ -161,9 +167,20 @@ class Schedule:
             return
         self.__hash = new_hash
         self.__departments = []
+        self.__name = None
+        self.__id = None
 
-        # Разбор XML по территориям
         xml_data = BeautifulSoup(data, 'lxml')
+        # Получение названия школы
+        if xml_data.find("title"):
+            self.__name = xml_data.find("title").text
+            position = self.__name.find("ГБОУ")
+            if position > 0:
+                self.__name = self.__name[position:]
+                self.__id = hash_string_to_byte(self.__name)
+        if self.__name is None:
+            self.__id = hash_string_to_byte(self.__url)
+        # Разбор XML по территориям
         h3_list = xml_data.find_all(
                 ['h3'],
                 attrs = {"class": "toggle-heading", "style": "text-align: center;"}
@@ -198,6 +215,16 @@ class Schedule:
         return len(self.__departments) > 0
 
     @property
+    def name(self) -> str:
+        """ Свойство возвращающее название школы """
+        return self.__name
+
+    @property
+    def id(self) -> int:
+        """ Свойство возвращающее идентификатор школы """
+        return self.__id
+
+    @property
     def departments(self, has_classes: bool = True) -> list:
         """ Свойство возвращающее список территорий """
         if has_classes:
@@ -222,6 +249,11 @@ class Schedule:
         """ Свойство возвращающее hash расписания """
         return self.__hash
 
+    @property
+    def url(self) -> str:
+        """ Свойство url страницы школы """
+        return self.__url
+
 def main():
     """
     Разбора учебного расписания
@@ -230,13 +262,14 @@ def main():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     cfg.disable_logger(["httpcore.connection", "httpcore.http11"])
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
-    schedule = Schedule()
-    schedule.parse(cfg.SCHEDULE_URL)
+    school: School = School(cfg.SCHEDULE_URL)
+    school.parse()    
     print("----------------------------------------------")
     id_dict = {}
     error_list = []
+    id_dict[school.id] = 1
     department: Department
-    for department in schedule.departments:
+    for department in school.departments:
         department_id = department.id
         if department_id in id_dict:
             id_dict[department_id] += 1

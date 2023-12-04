@@ -8,9 +8,9 @@ from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandl
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 import config as cfg
-from schedule_parser import Schedule, Department, SchoolClass
+from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
-from data import MenuData, create_schedule, get_schedule_object
+from data import MenuData, create_school, get_school_object
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
 используй команду /start для начала работы бота"""
@@ -23,12 +23,12 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """
     await context.bot.send_message(chat_id=update.effective_chat.id, text=HELLO_MESSAGE)
 
-def keyboard_button_schedule() -> InlineKeyboardMarkup:
+def keyboard_button_school() -> InlineKeyboardMarkup:
     """
-    Добавление кнопки расписание
+    Добавление кнопки расписание школы
     """
     keyboard = [
-        [InlineKeyboardButton("Расписание", callback_data="SCHEDULE")],
+        [InlineKeyboardButton("Школьное расписание", callback_data="SCHOOL")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -38,8 +38,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     user: User = update.effective_user
     logging.info(f"command start for {user.id}")
-    reply_markup: InlineKeyboardMarkup = keyboard_button_schedule()
-    create_schedule(context)
+    reply_markup: InlineKeyboardMarkup = keyboard_button_school()
+    create_school(context)
 
     await update.message.reply_text(
         f"Привет {user.first_name}! \n{HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
@@ -51,23 +51,23 @@ def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAU
     """
     Добавление кнопок корпусов
     """
-    schedule: Schedule
-    schedule, error_message = get_schedule_object("DEPARTMENT", menu_data, context)
+    school: School
+    school, error_message = get_school_object("DEPARTMENT", menu_data, context)
     if error_message:
         return None, error_message
     keyboard = []
     department: Department
-    for department in schedule.departments:
+    for department in school.departments:
         button = [InlineKeyboardButton(department.name, callback_data=MenuData(department.id).to_string("DEPARTMENT"))]
         keyboard.append(button)
     keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string("DEPARTMENT"))])
     return InlineKeyboardMarkup(keyboard), None
 
-async def schedule_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Нажата кнопка получения расписания
+    Нажата кнопка получения расписания школы
     """
-    logging.info("command schedule")
+    logging.info("command school")
     query = update.callback_query
     await query.answer()
 
@@ -84,7 +84,7 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
     Получение списка классов для корпуса department_index
     """
     department: Department
-    department, error_message = get_schedule_object("CLASS", menu_data, context)
+    department, error_message = get_school_object("CLASS", menu_data, context)
     if error_message:
         return None, error_message
 
@@ -106,7 +106,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     menu_data: MenuData = MenuData.from_string("DEPARTMENT", query.data)
     if menu_data.department == -1:
         # Нажата кнопка возврата
-        reply_markup = keyboard_button_schedule()
+        reply_markup = keyboard_button_school()
         await query.edit_message_text(HELLO_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
@@ -123,7 +123,7 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
     Получение списка дней недели для MenuData
     """
     day_of_week_list: list
-    day_of_week_list, error_message = get_schedule_object("DAY_OF_WEEK", menu_data, context)
+    day_of_week_list, error_message = get_school_object("DAY_OF_WEEK", menu_data, context)
     if error_message:
         return None, error_message
 
@@ -139,7 +139,7 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
     Получение списка недель месяца для MenuData
     """
     week_list: list
-    week_list, error_message = get_schedule_object("WEEK", menu_data, context)
+    week_list, error_message = get_school_object("WEEK", menu_data, context)
     if error_message:
         return None, error_message
 
@@ -225,12 +225,12 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     else:
         # Отобразить расписание
         lessons: Lesson
-        lessons, error_message = get_schedule_object("LESSONS", menu_data, context)
+        lessons, error_message = get_school_object("LESSONS", menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
         week_schedule: WeekSchedule
-        week_schedule, error_message = get_schedule_object("WEEK_SCHEDULE", menu_data, context)
+        week_schedule, error_message = get_school_object("WEEK_SCHEDULE", menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
@@ -261,7 +261,7 @@ def main() -> None:
         entry_points=[CommandHandler("start", start)],
         states={
             START_ROUTES: [
-                CallbackQueryHandler(schedule_button, pattern="^SCHEDULE"),
+                CallbackQueryHandler(school_button, pattern="^SCHOOL"),
                 CallbackQueryHandler(department_button, pattern="^DEPARTMENT*"),
                 CallbackQueryHandler(class_button, pattern="^CLASS*"),
                 CallbackQueryHandler(week_button, pattern="^WEEK*"),
