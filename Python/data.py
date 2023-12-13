@@ -22,7 +22,7 @@ class BotData:
         """ Свойство возвращающее объект школа """
         if self.__school is None:
             self.__school = School(cfg.SCHEDULE_URL)
-        self.__school.parse()
+        self.__school.load()
         return self.__school
 
 def create_school(context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 import config as cfg
 from week_pdf_parser import WeekSchedule, Lesson
 from cache_func import timed_lru_cache, hash_string_to_byte
+from database import save_to_db, load_from_db
 
 class SchoolClass:
     """
@@ -142,32 +143,60 @@ class School:
         self.__hash: str = ""
         # идентификатор
         self.__id: int = None
+        # Название текущего расписания
+        self.__schedule_name: str = None
 
-    @timed_lru_cache(60*60*24)
-    def parse(self) -> bool:
+    def get_hash(self, response: requests.models.Response) -> str:
         """
-        Процедура разбора url расписания
+        Получение хэша страницы
         """
-        # Получение html из Web
-        response = requests.get(self.__url)
-        if response.status_code != 200:
-            logging.error(f"Error get {self.__url}. error code {response.status_code}")
-            return False
         data = response.text
-        logging.info(f"get {data[:25]}...\n")
-
         # Уберем уникальные строки для подсчета хэша
         data_for_hash = re.sub(pattern = r"<link rel=\"stylesheet\" href=\"/css/app-project/app\.css.*/>", repl = "", string = data)
         data_for_hash = re.sub(pattern = r"<script defer src=\"/js/app-project/app.*</script>", repl = "", string = data_for_hash)
         data_for_hash = re.sub(pattern = r"<script async src=\"/js/app-project/build.*</script>", repl = "", string = data_for_hash)
+        data_for_hash = re.sub(pattern = r"<script type=\"text/javascript\" src=\"/js/jquery.functions.js\?v=.*></script>", repl = "", string = data_for_hash)
         data_for_hash = data_for_hash.encode('utf-8', errors='ignore')
-        new_hash = md5(data_for_hash).hexdigest()
-        logging.info(f"hash {new_hash}")
-        if self.__hash == new_hash:
-            return
+        return md5(data_for_hash).hexdigest()
+
+    @timed_lru_cache(60*60*24)
+    def load(self) -> bool:
+        """
+        Процедура загрузки данных о школе/расписании/корпусах
+        """
+        new_hash = None
+        try:
+            response: requests.models.Response = requests.get(self.__url, timeout = 1)
+            if response.status_code != 200:
+                logging.error(f"Error get {self.__url}. error code {response.status_code}")
+                return False
+            logging.info(f"get {response.text[:25]}...\n")
+            new_hash = self.get_hash(response)
+            logging.info(f"hash {new_hash}")
+        except requests.exceptions.ReadTimeout:
+            #ReadTimeout
+            logging.error("Timeout error. Try get data from database")
+
+        if self.__hash == new_hash and new_hash is not None:
+            return True
+
+        result = load_from_db(self, new_hash)
+        if not result and new_hash is not None:
+            result = self.load_from_url(new_hash, response)
+            if result:
+                save_to_db(self)
+            return result
+
+    def load_from_url(self, new_hash: str, response: requests.models.Response) -> bool:
+        """
+        Процедура разбора url расписания
+        """
+        # Получение html из Web
+        data = response.text
         self.__hash = new_hash
         self.__departments = []
         self.__name = None
+        self.__schedule_name: str = None
         self.__id = None
 
         xml_data = BeautifulSoup(data, 'lxml')
@@ -180,6 +209,11 @@ class School:
                 self.__id = hash_string_to_byte(self.__name)
         if self.__name is None:
             self.__id = hash_string_to_byte(self.__url)
+        # Получение текущего расписания
+        text_center = xml_data.find(['p'], attrs = {"style": "text-align: center;"})
+        if text_center:
+            schedule_name = text_center.text
+            self.__schedule_name = schedule_name.strip().replace('\xa0', ' ').replace('\r\n', ' ')
         # Разбор XML по территориям
         h3_list = xml_data.find_all(
                 ['h3'],
@@ -219,10 +253,30 @@ class School:
         """ Свойство возвращающее название школы """
         return self.__name
 
+    @name.setter
+    def name(self, value: str):
+        """ Запись свойства название школы """
+        self.__name = value
+
+    @property
+    def schedule_name(self) -> str:
+        """ Свойство возвращающее название текущего расписания """
+        return self.__schedule_name
+
+    @schedule_name.setter
+    def schedule_name(self, value: str):
+        """ Запись свойства названия текущего расписания """
+        self.__schedule_name = value
+
     @property
     def id(self) -> int:
         """ Свойство возвращающее идентификатор школы """
         return self.__id
+
+    @id.setter
+    def id(self, value: str):
+        """ Запись свойства идентификатор школы """
+        self.__id = value
 
     @property
     def departments(self, has_classes: bool = True) -> list:
@@ -237,6 +291,12 @@ class School:
         else:
             return self.__departments
 
+    def add_department(self, department: Department) -> None:
+        """
+        Добавляет подразделение
+        """
+        self.__departments.append(department)
+
     def get_department_by_id(self, department_id: int) -> Department:
         """ Поиск территории по идентификатору """
         department: Department
@@ -245,9 +305,25 @@ class School:
                 return department
         return None
 
+    def get_class_by_id(self, class_id: int) -> SchoolClass:
+        """ Поиск класса по идентификатору """
+        department: Department
+        for department in self.__departments:
+            class_: SchoolClass
+            for class_ in department.class_list:
+                if class_.id == class_id:
+                    return class_
+        return None
+
+    @property
     def hash(self) -> str:
         """ Свойство возвращающее hash расписания """
         return self.__hash
+
+    @hash.setter
+    def hash(self, value: str):
+        """ Запись свойства hash """
+        self.__hash = value
 
     @property
     def url(self) -> str:
@@ -263,7 +339,7 @@ def main():
     cfg.disable_logger(["httpcore.connection", "httpcore.http11"])
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
     school: School = School(cfg.SCHEDULE_URL)
-    school.parse()    
+    school.load()
     print("----------------------------------------------")
     id_dict = {}
     error_list = []

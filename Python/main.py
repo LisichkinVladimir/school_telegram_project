@@ -10,7 +10,8 @@ from telegram.constants import ParseMode
 import config as cfg
 from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
-from data import MenuData, create_school, get_school_object
+from data import MenuData, create_school, get_school_object, get_school
+from database import save_user_class, get_user_class
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
 используй команду /start для начала работы бота"""
@@ -23,13 +24,23 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """
     await context.bot.send_message(chat_id=update.effective_chat.id, text=HELLO_MESSAGE)
 
-def keyboard_button_school() -> InlineKeyboardMarkup:
+def keyboard_button_school(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     """
     Добавление кнопки расписание школы
     """
     keyboard = [
         [InlineKeyboardButton("Школьное расписание", callback_data="SCHOOL")],
     ]
+
+    user_id = update.effective_user.id
+    class_id = get_user_class(user_id)
+    if class_id is not None:
+        school: School = get_school(context)
+        class_: SchoolClass = school.get_class_by_id(class_id)
+        if class_ is not None:
+            button = [InlineKeyboardButton(class_.name, callback_data=MenuData(class_.department.id, class_.id).to_string("CLASS"))]
+            keyboard.append(button)
+
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -38,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     user: User = update.effective_user
     logging.info(f"command start for {user.id}")
-    reply_markup: InlineKeyboardMarkup = keyboard_button_school()
+    reply_markup: InlineKeyboardMarkup = keyboard_button_school(update, context)
     create_school(context)
 
     await update.message.reply_text(
@@ -106,7 +117,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     menu_data: MenuData = MenuData.from_string("DEPARTMENT", query.data)
     if menu_data.department == -1:
         # Нажата кнопка возврата
-        reply_markup = keyboard_button_school()
+        reply_markup = keyboard_button_school(update, context)
         await query.edit_message_text(HELLO_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
@@ -234,6 +245,11 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
+
+        user_id = update.effective_user.id
+        class_id = week_schedule.school_class.id
+        save_user_class(user_id, class_id)
+
         message = f"Расписание для класса {week_schedule.school_class.name}/{week_schedule.school_class.department.name}\n{week_schedule.school_class.link}\n"
         day_of_week_list = week_schedule.day_of_week_list(menu_data.week)
         message = f"{message}\n{day_of_week_list[menu_data.day_of_week]}:\n"
