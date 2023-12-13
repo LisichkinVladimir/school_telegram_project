@@ -14,89 +14,90 @@ meta = db_sql.MetaData()
 # Список школ
 schools = db_sql.Table(
     "schools", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
-    db_sql.Column("name", db_sql.String, nullable = False),       # Название
-    db_sql.Column("deleted", db_sql.DateTime)                     # дата удаления
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
+    db_sql.Column("name", db_sql.String, nullable = False),         # Название
+    db_sql.Column("deleted", db_sql.DateTime)                       # дата удаления
 )
 
 # Список корпусов школы
 departments = db_sql.Table(
     "departments", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
     db_sql.Column("school_id", db_sql.Integer, db_sql.ForeignKey("schools.id"), nullable = False),
-                                                    # Ссылка на школу
-    db_sql.Column("name", db_sql.String, nullable = False),       # Название
-    db_sql.Column("sequence", db_sql.Integer, nullable = False),  # Порядковый номер
-    db_sql.Column("deleted", db_sql.DateTime)                     # дата удаления
+                                                                    # Ссылка на школу
+    db_sql.Column("name", db_sql.String, nullable = False),         # Название
+    db_sql.Column("sequence", db_sql.Integer, nullable = False),    # Порядковый номер
+    db_sql.Column("deleted", db_sql.DateTime)                       # дата удаления
 )
 
 # Расписания школы
 schedules = db_sql.Table(
     "schedules", meta,
-    db_sql.Column("hash", db_sql.String, primary_key = True),     # Ключ
+    db_sql.Column("hash", db_sql.String, primary_key = True),       # Ключ
     db_sql.Column("school_id", db_sql.Integer, db_sql.ForeignKey("schools.id"), nullable = False),
-                                                    # Ссылка на школу
-    db_sql.Column("name", db_sql.String),                         # Название
-    db_sql.Column("deleted", db_sql.DateTime)                     # дата удаления
+                                                                    # Ссылка на школу
+    db_sql.Column("name", db_sql.String),                           # Название
+    db_sql.Column("deleted", db_sql.DateTime)                       # дата удаления
 )
 
 # Список классов
 classes = db_sql.Table(
     "classes", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
     db_sql.Column("department_id", db_sql.Integer, db_sql.ForeignKey("departments.id"), nullable = False),
-                                                    # Ссылка на корпус школы
-    db_sql.Column("name", db_sql.String, nullable = False),       # Название
-    db_sql.Column("number", db_sql.Integer),                      # Номер класса
-    db_sql.Column("link", db_sql.String),                         # url с расписанием класса на неделю
-    db_sql.Column("sequence", db_sql.Integer, nullable = False),  # Порядковый номер
-    db_sql.Column("deleted", db_sql.DateTime)                     # дата удаления
+                                                                    # Ссылка на корпус школы
+    db_sql.Column("name", db_sql.String, nullable = False),         # Название
+    db_sql.Column("number", db_sql.Integer),                        # Номер класса
+    db_sql.Column("link", db_sql.String),                           # url с расписанием класса на неделю
+    db_sql.Column("sequence", db_sql.Integer, nullable = False),    # Порядковый номер
+    db_sql.Column("deleted", db_sql.DateTime)                       # дата удаления
 )
 
 # Расписания по неделям класса
 week_schedules = db_sql.Table(
     "week_schedules", meta,
-    db_sql.Column("hash", db_sql.String, primary_key = True),         # Ключ
+    db_sql.Column("hash", db_sql.String, primary_key = True),       # Ключ
     db_sql.Column("schedule_hash", db_sql.String, db_sql.ForeignKey("schedules.hash"), nullable = False),
-                                                        # Ссылка на рабочее расписание класса
+                                                                    # Ссылка на рабочее расписание класса
     db_sql.Column("class_id", db_sql.Integer, db_sql.ForeignKey("classes.id"), nullable = False),
-                                                        # Ссылка на класс
-    db_sql.Column("created", db_sql.String),						    # дата создания
-	db_sql.Column("parse_result", db_sql.Boolean, nullable = False),  # Результат разбора
+                                                                    # Ссылка на класс
+    db_sql.Column("created", db_sql.String),						# дата создания
+	db_sql.Column("parse_result", db_sql.Boolean, nullable = False),# Результат разбора
 	db_sql.Column("parse_error", db_sql.String)						# Описание ошибки разбора
 )
 
 # Идентификатор урока
 lessons_ident = db_sql.Table(
     "lessons_ident", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
-    db_sql.Column("week", db_sql.Integer, nullable = False),      # чередование по неделям
-    db_sql.Column("hour_start", db_sql.String),					# начало урока
-    db_sql.Column("day_of_week", db_sql.String)					# день недели
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
+    db_sql.Column("week", db_sql.Integer, nullable = False),        # чередование по неделям
+    db_sql.Column("hour_start", db_sql.String),					    # начало урока
+    db_sql.Column("day_of_week", db_sql.String),				    # день недели
+    db_sql.Column("day_number", db_sql.Integer)				        # номер дня недели
 )
 
 # Список уроков
 lessons = db_sql.Table(
     "lessons", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
     db_sql.Column("ident_id", db_sql.Integer, db_sql.ForeignKey("lessons_ident.id"), nullable = False),
-                                                    # Идентификатор урока
+                                                                    # Идентификатор урока
     db_sql.Column("week_schedule_hash", db_sql.String, db_sql.ForeignKey("week_schedules.hash"), nullable = False),
-                                                    # Ссылка на расписание
+                                                                    # Ссылка на расписание
     db_sql.Column("hour_end", db_sql.String),					    # окончание урока
-    db_sql.Column("name", db_sql.String, nullable = False),       # Название урока
-    db_sql.Column("office", db_sql.String),                       # кабинет
-    db_sql.Column("group_name", db_sql.String),                   # группа
-    db_sql.Column("teacher", db_sql.String),                      # преподаватель
-    db_sql.Column("row_data", db_sql.String)                      # сырые данных
+    db_sql.Column("name", db_sql.String, nullable = False),         # Название урока
+    db_sql.Column("office", db_sql.String),                         # кабинет
+    db_sql.Column("group_name", db_sql.String),                     # группа
+    db_sql.Column("teacher", db_sql.String),                        # преподаватель
+    db_sql.Column("row_data", db_sql.String)                        # сырые данных
 )
 
 # Список пользователей
 users = db_sql.Table(
     "users", meta,
-    db_sql.Column("id", db_sql.Integer, primary_key = True),      # Ключ
+    db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
     db_sql.Column("class_id", db_sql.Integer, db_sql.ForeignKey("classes.id"), nullable = False)
-                                                    # Класс к которому последний раз делался запрос пользователем
+                                                                    # Класс к которому последний раз делался запрос пользователем
 )
 
 meta.create_all(engine)
