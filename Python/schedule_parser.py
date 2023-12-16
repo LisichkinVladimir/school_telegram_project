@@ -166,7 +166,7 @@ class School:
         """
         new_hash = None
         try:
-            response: requests.models.Response = requests.get(self.__url, timeout = 1)
+            response: requests.models.Response = requests.get(self.__url, timeout = 10)
             if response.status_code != 200:
                 logging.error(f"Error get {self.__url}. error code {response.status_code}")
                 return False
@@ -178,12 +178,15 @@ class School:
             logging.error("Timeout error. Try get data from database")
 
         if self.__hash == new_hash and new_hash is not None:
+            # рахбор не нужен - хэш совпадает - значит данные не изменились
             return True
 
         result = load_from_db(self, new_hash)
         if not result and new_hash is not None:
+            # Данных в базе данных нет - разбираем данные страницы
             result = self.load_from_url(new_hash, response)
             if result:
+                # записываем созданные объекты в базу
                 save_to_db(self)
             return result
 
@@ -214,7 +217,7 @@ class School:
         if text_center:
             schedule_name = text_center.text
             self.__schedule_name = schedule_name.strip().replace('\xa0', ' ').replace('\r\n', ' ')
-        # Разбор XML по территориям
+        # Разбор HTML по территориям
         h3_list = xml_data.find_all(
                 ['h3'],
                 attrs = {"class": "toggle-heading", "style": "text-align: center;"}

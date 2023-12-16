@@ -1,14 +1,20 @@
 """
 Модуль работы с базой данных
 """
-from os.path import dirname, abspath
+from os.path import dirname, abspath, exists
+from os import mkdir
 import datetime
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
 
 path = dirname(dirname(abspath(__file__)))
-db_path = f"{path}/data/data.db"
-engine = db_sql.create_engine(f"sqlite:///{db_path}")
+# Место расположения Базы данных
+db_path = f"{path}/data/"
+if not exists(db_path):
+    # создаем директорию
+    mkdir(db_path)
+file_path = f"{db_path}/data.db"
+engine = db_sql.create_engine(f"sqlite:///{file_path}")
 meta = db_sql.MetaData()
 
 # Список школ
