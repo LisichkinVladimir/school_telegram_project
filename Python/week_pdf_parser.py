@@ -188,7 +188,7 @@ class Lesson:
                     result = f"{result} {group_item.teacher}"
         return result.strip()
 
-class WayOfWeek:
+class DayOfWeek:
     """
     Вспомогательный класс предназначенный для поиска строки или столбцов дней недели
     """
@@ -198,7 +198,8 @@ class WayOfWeek:
         2: ['СР', 'СРЕДА'],
         3: ['ЧТ', 'ЧЕТВЕРГ'],
         4: ['ПТ', 'ПЯТНИЦА'],
-        5: ['СБ', 'СУББОТА']
+        5: ['СБ', 'СУББОТА'],
+        6: ['ВС', 'ВОСКРЕСЕНЬЕ']
     }
 
     def get_week_index(self, week_name: str)->int:
@@ -245,7 +246,7 @@ class WayOfWeek:
                             self.__row_index = -1
                         if self.__column_index != value[1]:
                             self.__column_index = -1
-        # Сортировка
+        # Сортировка ао номеру дня недели от Пн-Вс
         week_name_indexes = {}
         week_number_indexes = {}
         sorted_index = sorted(self.__week_number_indexes.items())
@@ -390,7 +391,7 @@ class WeekSchedule:
             lesson: Lesson = self.__lesson_dict[lesson_ident]
             lesson.groups.append(new_lesson)
 
-    def __parse_week_by_row(self, table: list, day_of_week: WayOfWeek, class_name: str = None) -> bool:
+    def __parse_week_by_row(self, table: list, day_of_week: DayOfWeek, class_name: str = None) -> bool:
         """
         Разбор расписания где дни недели по строкам к строке day_of_week.row_index
         """
@@ -456,7 +457,7 @@ class WeekSchedule:
                                         group.hour_end = hour
         return self.__last_parse_result
 
-    def __parse_week_by_column(self, table: list, day_of_week: WayOfWeek, class_name: str = None) -> bool:
+    def __parse_week_by_column(self, table: list, day_of_week: DayOfWeek, class_name: str = None) -> bool:
         """
         Разбор расписания где дни недели по столбцам к столбце day_of_week.column_index
         """
@@ -553,7 +554,7 @@ class WeekSchedule:
             for table in tables:
                 if len(table) > 0:
                     # Получение индексов дней недели
-                    day_of_wek: WayOfWeek = WayOfWeek(tables)
+                    day_of_wek: DayOfWeek = DayOfWeek(tables)
                     if day_of_wek.has_week:
                         if day_of_wek.row_index >= 0 and day_of_wek.column_index == -1:
                             logging.info(f"week indexes by row {day_of_wek.row_index}")
