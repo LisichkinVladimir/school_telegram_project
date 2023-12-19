@@ -106,6 +106,17 @@ users = db_sql.Table(
                                                                     # Класс к которому последний раз делался запрос пользователем
 )
 
+# ошибки бота
+errors = db_sql.Table(
+    "errors", meta,
+    db_sql.Column("created", db_sql.DateTime),                      # дата создания
+    db_sql.Column("user_id", db_sql.Integer, primary_key = True),   # пользователь
+    db_sql.Column("traceback", db_sql.String),                      # стек
+    db_sql.Column("update_data", db_sql.String),                    # данные в update
+    db_sql.Column("context_chat", db_sql.String),                   # данные в context.chat
+    db_sql.Column("context_user", db_sql.String)                    # данные в context.user
+)
+
 meta.create_all(engine)
 session = Session(engine)
 
@@ -283,3 +294,21 @@ def get_user_class(user_id) -> int:
         return None
     else:
         return users_data.class_id
+
+def save_error(user_id: int, traceback: str, update: str, context_chat: str, context_user: str) -> None:
+    """"
+    Сохранение информации об ошибка
+    """
+    def escape_sql_text(text: str) -> str:
+        return text.replace("\\", "\\\\").replace("_", "\\_").replace("'", "''")
+
+    stmt = errors.insert().values(
+        created = datetime.datetime.now(),
+        user_id = user_id,
+        traceback = escape_sql_text(traceback),
+        update_data = escape_sql_text(update),
+        context_chat = escape_sql_text(context_chat),
+        context_user = escape_sql_text(context_user)
+    )
+    session.execute(stmt)
+    session.commit()

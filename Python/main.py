@@ -4,6 +4,7 @@ python-telegram-bot
 """
 import sys
 import logging
+import traceback
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -12,7 +13,7 @@ from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
 from data import MenuData, create_school, get_school_object, get_school
 from data import DEPARTMENT_OBJECT, CLASS_OBJECT, WEEK_SCHEDULE_OBJECT, WEEK_OBJECT, DAY_OF_WEEK_OBJECT, LESSONS_OBJECT
-from database import save_user_class, get_user_class
+from database import save_user_class, get_user_class, save_error
 
 HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
 используй команду /start для начала работы бота"""
@@ -138,12 +139,17 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
     day_of_week_list, error_message = get_school_object(DAY_OF_WEEK_OBJECT, menu_data, context)
     if error_message:
         return None, error_message
+    week_list, error_message = get_school_object(WEEK_OBJECT, menu_data, context)
+    if error_message:
+        return None, error_message
 
     keyboard = []
     for index, week_day in enumerate(day_of_week_list):
         button = [InlineKeyboardButton(week_day, callback_data=MenuData(menu_data.department, menu_data.class_, menu_data.week, index).to_string(DAY_OF_WEEK_OBJECT))]
         keyboard.append(button)
-    keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string(DAY_OF_WEEK_OBJECT))])
+    if len(week_list) > 1:
+        keyboard.append([InlineKeyboardButton("<<Назад к N недели", callback_data=MenuData(menu_data.department, menu_data.class_, -2).to_string(DAY_OF_WEEK_OBJECT))])
+    keyboard.append([InlineKeyboardButton("<<Назад к классам", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string(DAY_OF_WEEK_OBJECT))])
     return InlineKeyboardMarkup(keyboard), None
 
 def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -201,7 +207,7 @@ async def week_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await query.answer()
     menu_data: MenuData = MenuData.from_string(WEEK_OBJECT, query.data)
     if menu_data.class_ == -1:
-        # Нажата кнопка возврата
+        # Нажата кнопка возврата к классам
         reply_markup, error_message = keyboard_button_classes(menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
@@ -227,12 +233,20 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await query.answer()
     menu_data: MenuData = MenuData.from_string(DAY_OF_WEEK_OBJECT, query.data)
     if menu_data.week == -1:
-        # Нажата кнопка возврата
+        # Нажата кнопка возврата к классам
         reply_markup, error_message = keyboard_button_classes(menu_data, context)
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
         await query.edit_message_text("Выберете класс", reply_markup=reply_markup)
+        return START_ROUTES
+    elif menu_data.week == -2:
+        # Нажата кнопка возврата к неделям месяца
+        reply_markup, error_message = keyboard_button_week(menu_data, context)
+        if error_message:
+            await query.edit_message_text(error_message)
+            return START_ROUTES
+        await query.edit_message_text("Выберете неделю месяца", reply_markup=reply_markup)
         return START_ROUTES
     else:
         # Отобразить расписание
@@ -261,6 +275,23 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await query.edit_message_text(message, parse_mode=ParseMode.HTML)
         return START_ROUTES
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Обработка ошибок
+    """
+    logging.error("Exception:", exc_info=context.error)
+
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    update_str = update.to_dict() if isinstance(update, Update) else str(update)
+    message = "An exception was raised while handling an update\n" + \
+        f"update = {update_str}\n" + \
+        f"context.chat_data = {str(context.chat_data)}\n" + \
+        f"context.user_data = {str(context.user_data)}\n" + \
+        f"traceback = {tb_string}"
+    logging.error(f"Error info:{message}")
+    save_error(update.effective_user.id, tb_string, str(update_str), str(context.chat_data), str(context.user_data))
+
 def main() -> None:
     """
     Запуск бота
@@ -288,6 +319,9 @@ def main() -> None:
         fallbacks=[CommandHandler("start", start)],
     )
     application.add_handler(conv_handler)
+
+    # обработчик ошибок
+    application.add_error_handler(error_handler)
 
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
