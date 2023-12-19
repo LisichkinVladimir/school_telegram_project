@@ -178,7 +178,7 @@ class School:
             logging.error("Timeout error. Try get data from database")
 
         if self.__hash == new_hash and new_hash is not None:
-            # рахбор не нужен - хэш совпадает - значит данные не изменились
+            # разбор не нужен - хэш совпадает - значит данные не изменились
             return True
 
         result = load_from_db(self, new_hash)
