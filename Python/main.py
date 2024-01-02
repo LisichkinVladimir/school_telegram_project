@@ -14,9 +14,7 @@ from week_pdf_parser import Lesson, WeekSchedule
 from data import MenuData, create_school, get_school_object, get_school
 from data import DEPARTMENT_OBJECT, CLASS_OBJECT, WEEK_SCHEDULE_OBJECT, WEEK_OBJECT, DAY_OF_WEEK_OBJECT, LESSONS_OBJECT
 from database import save_user_class, get_user_class, save_error
-
-HELLO_MESSAGE = """Бот школьное_расписание предназначен для удобства школьников школы 1502 и получения свежей информации об изменении расписания\n
-используй команду /start для начала работы бота"""
+import messages
 
 START_ROUTES, END_ROUTES = range(2)
 
@@ -24,14 +22,14 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """
     Отправка сообщения
     """
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=HELLO_MESSAGE)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=messages.HELLO_MESSAGE)
 
 def keyboard_button_school(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     """
     Добавление кнопки расписание школы
     """
     keyboard = [
-        [InlineKeyboardButton("Школьное расписание", callback_data="SCHOOL")],
+        [InlineKeyboardButton(messages.SCHEDULE_MESSAGE, callback_data="SCHOOL")],
     ]
 
     user_id = update.effective_user.id
@@ -55,7 +53,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     create_school(context)
 
     await update.message.reply_text(
-        f"Привет {user.first_name}! \n{HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
+        f"Привет {user.first_name}! \n{messages.HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
         reply_markup=reply_markup,
     )
     return START_ROUTES
@@ -73,7 +71,7 @@ def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAU
     for department in school.departments:
         button = [InlineKeyboardButton(department.name, callback_data=MenuData(department.id).to_string(DEPARTMENT_OBJECT))]
         keyboard.append(button)
-    keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string(DEPARTMENT_OBJECT))])
+    keyboard.append([InlineKeyboardButton(messages.BACK_MESSAGE, callback_data=MenuData().to_string(DEPARTMENT_OBJECT))])
     return InlineKeyboardMarkup(keyboard), None
 
 async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -89,7 +87,7 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if error_message:
         await query.edit_message_text(error_message)
         return START_ROUTES
-    await query.edit_message_text(text="Выберете корпус:", reply_markup=reply_markup)
+    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
     return START_ROUTES
 
 def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -106,7 +104,7 @@ def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_T
     for class_ in department.class_list:
         button = [InlineKeyboardButton(class_.name, callback_data=MenuData(menu_data.department, class_.id).to_string(CLASS_OBJECT))]
         keyboard.append(button)
-    keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData().to_string(CLASS_OBJECT))])
+    keyboard.append([InlineKeyboardButton(messages.BACK_MESSAGE, callback_data=MenuData().to_string(CLASS_OBJECT))])
     return InlineKeyboardMarkup(keyboard), None
 
 async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -120,7 +118,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if menu_data.department == -1:
         # Нажата кнопка возврата
         reply_markup = keyboard_button_school(update, context)
-        await query.edit_message_text(HELLO_MESSAGE, reply_markup=reply_markup)
+        await query.edit_message_text(messages.HELLO_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
         # Нажата кнопка корпуса
@@ -128,7 +126,7 @@ async def department_button(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете класс", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_CLASS_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
 
 def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -148,8 +146,8 @@ def keyboard_button_day_of_week(menu_data: MenuData, context: ContextTypes.DEFAU
         button = [InlineKeyboardButton(week_day, callback_data=MenuData(menu_data.department, menu_data.class_, menu_data.week, index).to_string(DAY_OF_WEEK_OBJECT))]
         keyboard.append(button)
     if len(week_list) > 1:
-        keyboard.append([InlineKeyboardButton("<<Назад к N недели", callback_data=MenuData(menu_data.department, menu_data.class_, -2).to_string(DAY_OF_WEEK_OBJECT))])
-    keyboard.append([InlineKeyboardButton("<<Назад к классам", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string(DAY_OF_WEEK_OBJECT))])
+        keyboard.append([InlineKeyboardButton(f"{messages.BACK_MESSAGE} к N недели", callback_data=MenuData(menu_data.department, menu_data.class_, -2).to_string(DAY_OF_WEEK_OBJECT))])
+    keyboard.append([InlineKeyboardButton(f"{messages.BACK_MESSAGE} к классам", callback_data=MenuData(menu_data.department, menu_data.class_, -1).to_string(DAY_OF_WEEK_OBJECT))])
     return InlineKeyboardMarkup(keyboard), None
 
 def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -168,7 +166,7 @@ def keyboard_button_week(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE
         for week in week_list:
             button = [InlineKeyboardButton(f"Неделя месяца {week}", callback_data=MenuData(menu_data.department, menu_data.class_, week).to_string(WEEK_OBJECT))]
             keyboard.append(button)
-        keyboard.append([InlineKeyboardButton("<<Назад", callback_data=MenuData(menu_data.department, -1).to_string(WEEK_OBJECT))])
+        keyboard.append([InlineKeyboardButton(messages.BACK_MESSAGE, callback_data=MenuData(menu_data.department, -1).to_string(WEEK_OBJECT))])
         return InlineKeyboardMarkup(keyboard), None
     else:
         return "Ошибка получения списка недель", None
@@ -187,7 +185,7 @@ async def class_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text(text="Выберете корпус:", reply_markup=reply_markup)
+        await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
         # Запросить список недель месяца
@@ -195,7 +193,7 @@ async def class_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете неделю месяца", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_WEEK_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
 
 async def week_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -212,7 +210,7 @@ async def week_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете класс", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_CLASS_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
         # Запросить дни недели расписания
@@ -220,7 +218,7 @@ async def week_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете день", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_DAY_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     return START_ROUTES
 
@@ -238,7 +236,7 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете класс", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_CLASS_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     elif menu_data.week == -2:
         # Нажата кнопка возврата к неделям месяца
@@ -246,7 +244,7 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if error_message:
             await query.edit_message_text(error_message)
             return START_ROUTES
-        await query.edit_message_text("Выберете неделю месяца", reply_markup=reply_markup)
+        await query.edit_message_text(messages.CHOICE_WEEK_MESSAGE, reply_markup=reply_markup)
         return START_ROUTES
     else:
         # Отобразить расписание
