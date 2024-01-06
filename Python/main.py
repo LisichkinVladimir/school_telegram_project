@@ -5,7 +5,7 @@ python-telegram-bot
 import sys
 import logging
 import traceback
-from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler, PicklePersistence
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 import config as cfg
@@ -13,7 +13,7 @@ from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
 from data import MenuData, create_school, get_school_object, get_school
 from data import DEPARTMENT_OBJECT, CLASS_OBJECT, WEEK_SCHEDULE_OBJECT, WEEK_OBJECT, DAY_OF_WEEK_OBJECT, LESSONS_OBJECT
-from database import save_user_class, get_user_class, save_error
+from database import get_data_path, save_user_class, get_user_class, save_error
 import messages
 
 START_ROUTES, END_ROUTES = range(2)
@@ -300,7 +300,10 @@ def main() -> None:
     cfg.disable_logger(["httpcore.connection", "httpcore.http11"])
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
     logging.info("Start bot")
-    application = Application.builder().token(cfg.BOT_TOKEN).build()
+    db_path = get_data_path()
+    file_path = f"{db_path}/bot_persistence"
+    persistence = PicklePersistence(filepath=file_path)
+    application = Application.builder().token(cfg.BOT_TOKEN).persistence(persistence).build()
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
     conv_handler = ConversationHandler(
@@ -315,6 +318,8 @@ def main() -> None:
             ]
         },
         fallbacks=[CommandHandler("start", start)],
+        name="bot_conversation",
+        persistent=True,
     )
     application.add_handler(conv_handler)
 

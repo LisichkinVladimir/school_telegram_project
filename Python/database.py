@@ -7,12 +7,20 @@ import datetime
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
 
-path = dirname(dirname(abspath(__file__)))
+def get_data_path() -> str:
+    """
+    Место расположения Базы данных
+    """
+    path = dirname(dirname(abspath(__file__)))
+    # Место расположения Базы данных
+    db_path = f"{path}/data/"
+    if not exists(db_path):
+        # создаем директорию
+        mkdir(db_path)
+    return db_path
+
 # Место расположения Базы данных
-db_path = f"{path}/data/"
-if not exists(db_path):
-    # создаем директорию
-    mkdir(db_path)
+db_path = get_data_path()
 file_path = f"{db_path}/data.db"
 engine = db_sql.create_engine(f"sqlite:///{file_path}")
 meta = db_sql.MetaData()
