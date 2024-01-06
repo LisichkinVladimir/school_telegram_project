@@ -330,13 +330,42 @@ class WeekSchedule:
         self.__last_parse_error = None
         self.__lesson_dict = {}
 
+    def __parse_office(self, lesson: str) -> tuple:
+        """
+        Разбираем кабинет в названии урока
+        """
+        office = None
+        match = re.search(R"\d+\D{0,1}", lesson)
+        if match:
+            office = lesson[match.start():match.end()].strip()
+            lesson = lesson.replace(office, "").strip()
+            if office[-1] == ",":
+                match = re.search(R"\d+", lesson)
+                if match:
+                    office2 = lesson[match.start():match.end()].strip()
+                    lesson = lesson.replace(office2, "").strip()
+                    office = office + office2 
+
+        return (office, lesson)
+    
+    def __parse_teacher(self, lesson)-> tuple:
+        """
+        разбор фамилии учителя"""
+        teacher = None
+        match = re.search(R"\s[а-яА-Я]+\s\D\.\D\.", lesson)
+        if match:
+            teacher = lesson[match.start():].strip()
+            lesson = lesson.replace(teacher, "").strip()
+        return(teacher, lesson)
+
+
     def __parse_lesson(self, lesson: str, week, hour, day_of_week: str, day_of_week_number: int, class_name: str = None) -> None:
         """
         Разобрать lesson - достать name/office/group
         """
         row_data = lesson
         lesson = lesson.replace("\n", " ")
-        # group
+        # group - поиск групп в названии
         group = None
         if self.__school_class is not None:
             class_name = self.__school_class.name
@@ -359,22 +388,19 @@ class WeekSchedule:
             elif "2 группа" in lesson:
                 group = "2 группа"
                 lesson = lesson.replace("2 группа", "")
-        # office
-        office = None
-        match = re.search(R"\d+\D{0,1}", lesson)
-        if match:
-            office = lesson[match.start():match.end()].strip()
-            lesson = lesson.replace(office, "").strip()
-        # teacher
-        teacher = None
-        match = re.search(R"\s[а-яА-Я]+\s\D\.\D\.", lesson)
-        if match:
-            teacher = lesson[match.start():].strip()
-            lesson = lesson.replace(teacher, "").strip()
+        # office - поиск кабинета
+        parse_office = self.__parse_office(lesson)
+        office = parse_office[0]
+        lesson = parse_office[1]
+        # teacher - поиск учителя
+        parse__teacher = self.__parse_teacher(lesson)
+        teacher= parse__teacher[0]
+        lesson = parse__teacher[1]
         name = lesson
         logging.info(f"day_of_week={day_of_week} lesson={name} group={group} office={office} teacher={teacher}")
         if name == "":
             return
+        # Создание урока по найденным значениям
         lesson_ident: LessonIdent = LessonIdent(week, hour, day_of_week, day_of_week_number)
         new_lesson = Lesson(
             ident = lesson_ident,
