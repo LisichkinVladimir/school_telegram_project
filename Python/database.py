@@ -1,23 +1,10 @@
 """
 Модуль работы с базой данных
 """
-from os.path import dirname, abspath, exists
-from os import mkdir
 import datetime
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
-
-def get_data_path() -> str:
-    """
-    Место расположения Базы данных
-    """
-    path = dirname(dirname(abspath(__file__)))
-    # Место расположения Базы данных
-    db_path = f"{path}/data/"
-    if not exists(db_path):
-        # создаем директорию
-        mkdir(db_path)
-    return db_path
+from config import get_data_path
 
 # Место расположения Базы данных
 db_path = get_data_path()

@@ -358,7 +358,6 @@ class WeekSchedule:
             lesson = lesson.replace(teacher, "").strip()
         return(teacher, lesson)
 
-
     def __parse_lesson(self, lesson: str, week, hour, day_of_week: str, day_of_week_number: int, class_name: str = None) -> None:
         """
         Разобрать lesson - достать name/office/group
@@ -393,9 +392,9 @@ class WeekSchedule:
         office = parse_office[0]
         lesson = parse_office[1]
         # teacher - поиск учителя
-        parse__teacher = self.__parse_teacher(lesson)
-        teacher= parse__teacher[0]
-        lesson = parse__teacher[1]
+        parse_teacher = self.__parse_teacher(lesson)
+        teacher= parse_teacher[0]
+        lesson = parse_teacher[1]
         name = lesson
         logging.info(f"day_of_week={day_of_week} lesson={name} group={group} office={office} teacher={teacher}")
         if name == "":

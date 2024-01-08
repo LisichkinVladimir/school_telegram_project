@@ -23,6 +23,18 @@ def disable_logger(log_list: list) -> None:
     for log in log_list:
         logging.getLogger(log).disabled = True
 
+def get_data_path() -> str:
+    """
+    Место расположения данных приложения
+    """
+    path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Место расположения данных приложения
+    db_path = f"{path}/data/"
+    if not os.path.exists(db_path):
+        # создаем директорию
+        os.mkdir(db_path)
+    return db_path
+
 def main():
     raise SystemError("This file cannot be operable")
 
