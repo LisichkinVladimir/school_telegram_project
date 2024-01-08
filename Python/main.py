@@ -288,7 +288,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         f"context.user_data = {str(context.user_data)}\n" + \
         f"traceback = {tb_string}"
     logging.error(f"Error info:{message}")
-    save_error(update.effective_user.id, tb_string, str(update_str), str(context.chat_data), str(context.user_data))
+    user_id = 0
+    if update.effective_user is not None:
+        user_id = update.effective_user.id
+    save_error(user_id, tb_string, str(update_str), str(context.chat_data), str(context.user_data))
 
 def main() -> None:
     """
