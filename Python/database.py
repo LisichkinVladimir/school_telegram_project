@@ -104,8 +104,8 @@ users = db_sql.Table(
 # ошибки бота
 errors = db_sql.Table(
     "errors", meta,
-    db_sql.Column("created", db_sql.DateTime),                      # дата создания
-    db_sql.Column("user_id", db_sql.Integer, primary_key = True),   # пользователь
+    db_sql.Column("created", db_sql.DateTime, , primary_key = True),# дата создания
+    db_sql.Column("user_id", db_sql.Integer),                       # пользователь
     db_sql.Column("traceback", db_sql.String),                      # стек
     db_sql.Column("update_data", db_sql.String),                    # данные в update
     db_sql.Column("context_chat", db_sql.String),                   # данные в context.chat
