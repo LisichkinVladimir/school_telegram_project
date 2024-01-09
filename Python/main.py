@@ -91,6 +91,7 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if query.message.text == message:
         # Протокол телеграмма не позволяет поменять текст сообщения на тот же самый текст - возникает ошибка Message is not modified: specified new message content
         message += ' ' + message
+        logging.warn("message is same - change it")
     await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)    
     return START_ROUTES
 
