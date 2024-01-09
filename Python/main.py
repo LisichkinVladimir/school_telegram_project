@@ -87,7 +87,11 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if error_message:
         await query.edit_message_text(error_message)
         return START_ROUTES
-    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
+    message = messages.CHOICE_DEPARTMENT_MESSAGE
+    if query.message.text == message:
+        # Протокол телеграмма не позволяет поменять текст сообщения на тот же самый текст - возникает ошибка Message is not modified: specified new message content
+        message += ' ' + message
+    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)    
     return START_ROUTES
 
 def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -284,6 +288,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     update_str = update.to_dict() if isinstance(update, Update) else str(update)
     message = "An exception was raised while handling an update\n" + \
         f"update = {update_str}\n" + \
+        f"context.chat_data = {str(context.bot_data)}\n" + \
         f"context.chat_data = {str(context.chat_data)}\n" + \
         f"context.user_data = {str(context.user_data)}\n" + \
         f"traceback = {tb_string}"
