@@ -11,6 +11,7 @@ db_path = get_data_path()
 file_path = f"{db_path}/data.db"
 engine = db_sql.create_engine(f"sqlite:///{file_path}")
 meta = db_sql.MetaData()
+session = Session(engine)
 
 # Список школ
 schools = db_sql.Table(
@@ -93,12 +94,20 @@ lessons = db_sql.Table(
     db_sql.Column("row_data", db_sql.String)                        # сырые данных
 )
 
+connection = engine.connect()
+user_data = connection.execute(db_sql.text("select * from users where id=-1"))
+if "name" not in user_data.keys():
+    connection.execute(db_sql.text("alter table users add name VARCHAR"))
+if "updated" not in user_data.keys():
+    connection.execute(db_sql.text("alter table users add updated DATETIME"))
 # Список пользователей
 users = db_sql.Table(
     "users", meta,
     db_sql.Column("id", db_sql.Integer, primary_key = True),        # Ключ
-    db_sql.Column("class_id", db_sql.Integer, db_sql.ForeignKey("classes.id"), nullable = False)
+    db_sql.Column("class_id", db_sql.Integer, db_sql.ForeignKey("classes.id"), nullable = False),
                                                                     # Класс к которому последний раз делался запрос пользователем
+    db_sql.Column("name", db_sql.String),                           # Имя пользователя
+    db_sql.Column("updated", db_sql.DateTime)                       # дата обновления
 )
 
 # ошибки бота
@@ -113,7 +122,6 @@ errors = db_sql.Table(
 )
 
 meta.create_all(engine)
-session = Session(engine)
 
 def save_to_db(school) -> None:
     """
@@ -260,7 +268,7 @@ def load_from_db(school, new_hash: str) -> bool:
     school.hash = new_hash
     return True
 
-def save_user_class(user_id: int, class_id: int) -> None:
+def save_user_class(user_id: int, class_id: int, user_name: str) -> None:
     """
     Сохранение данных о последнем запрошенном пользователем классе
     """
@@ -269,13 +277,16 @@ def save_user_class(user_id: int, class_id: int) -> None:
         stmt = users.update() \
             .where(users.c.id == user_id) \
             .values(
-                class_id = class_id
-
+                class_id = class_id,
+                name = user_name,
+                updated = datetime.datetime.now()
             )
     else:
         stmt = users.insert().values(
             id = user_id,
-            class_id = class_id
+            class_id = class_id,
+            name = user_name,
+            updated = datetime.datetime.now()
         )
     session.execute(stmt)
     session.commit()

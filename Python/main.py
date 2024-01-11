@@ -91,8 +91,8 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if query.message.text == message:
         # Протокол телеграмма не позволяет поменять текст сообщения на тот же самый текст - возникает ошибка Message is not modified: specified new message content
         message += ' ' + message
-        logging.warn("message is same - change it")
-    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)    
+        logging.warning("message is same - change it")
+    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
     return START_ROUTES
 
 def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -266,7 +266,8 @@ async def day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
         user_id = update.effective_user.id
         class_id = week_schedule.school_class.id
-        save_user_class(user_id, class_id)
+        user_name = update.effective_user.full_name
+        save_user_class(user_id, class_id, user_name)
 
         message = f"Расписание для класса {week_schedule.school_class.name}/{week_schedule.school_class.department.name}\n{week_schedule.school_class.link}\n"
         day_of_week_list = week_schedule.day_of_week_list(menu_data.week)
@@ -312,7 +313,10 @@ def main() -> None:
     db_path = cfg.get_data_path()
     file_path = f"{db_path}/bot_persistence"
     persistence = PicklePersistence(filepath=file_path, update_interval = 20)
-    application = Application.builder().token(cfg.BOT_TOKEN).persistence(persistence).build()
+    application = Application.builder().token(cfg.BOT_TOKEN).persistence(persistence)   \
+        .read_timeout(30)  \
+        .write_timeout(30) \
+        .build()
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
     conv_handler = ConversationHandler(
