@@ -2,6 +2,7 @@
 Модуль данных сессии бота
 """
 import logging
+from datetime import datetime
 from telegram.ext import ContextTypes
 from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import WeekSchedule
@@ -32,7 +33,36 @@ class BotData:
         self.__school.load()
         return self.__school
 
-def create_school(context: ContextTypes.DEFAULT_TYPE) -> None:
+class UserData:
+    """
+    Данные сессии пользователя
+    """
+    def __init__(self):
+        """
+        Конструктор класса
+        """
+        self.last_class_name: str = None
+        self.last_datetime = None
+        self.user_id: int = None
+        self.seconds: int = None
+
+    def __str__(self):
+        """ 
+        Преобразование в строку
+        """
+        last_datetime = ""
+        if self.last_datetime is not None:
+            last_datetime = self.last_datetime.strftime("%d/%m/%y %H:%M")
+        else:
+            last_datetime = None
+        return f"user_id={self.user_id} last_class_name={self.last_class_name} last_datetime={last_datetime} seconds={self.seconds}"
+
+class IntervalError(Exception):
+    """ Класс ошибки когда между запросами минимальный интервал"""
+    def __init__(self, message):
+        pass
+
+def create_context_data(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
     """
     Создать расписание
     """
@@ -46,12 +76,18 @@ def create_school(context: ContextTypes.DEFAULT_TYPE) -> None:
             logging.info("Create BotData for bot_data")
             bot_data = BotData()
             context.user_data["BotData"] = bot_data
+    if context.user_data is not None:
+        if "UserData" not in context.user_data:
+            logging.info("Create UserData")
+            user_data = UserData()
+            user_data.user_id = user_id
+            context.user_data["UserData"] = user_data
 
-def get_school(context: ContextTypes.DEFAULT_TYPE) -> School:
+def get_school(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> School:
     """
     Получить данные школы
     """
-    create_school(context)
+    create_context_data(context, user_id)
     if context.bot_data is not None and "BotData" in context.bot_data:
         logging.info("Get school from bot_data")
         return context.bot_data["BotData"].school
@@ -130,9 +166,22 @@ def get_school_object(class_name: str, menu_data: MenuData, context: ContextType
     """
     Получить объект типа class_name
     """
-    school: School = get_school(context)
+    school: School = get_school(context, None)
     if school is None:
         return None, "Расписание не загружено"
+    if context.user_data is not None and "UserData" in context.user_data:
+        user_data: UserData = context.user_data["UserData"]
+        if user_data.last_class_name is None:
+            user_data.last_class_name = class_name
+            user_data.last_datetime = datetime.now()
+        elif user_data.last_class_name == class_name and user_data.last_datetime is not None:
+            user_data.seconds = (datetime.now() - user_data.last_datetime).total_seconds()
+            if user_data.seconds < 10:
+                logging.warning("Interval is too small")
+                raise IntervalError("Interval is too small")
+        else:
+            user_data.seconds = None           
+
     if class_name == DEPARTMENT_OBJECT:
         return school, None
 

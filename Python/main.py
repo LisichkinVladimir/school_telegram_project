@@ -11,7 +11,7 @@ from telegram.constants import ParseMode
 import config as cfg
 from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
-from data import MenuData, create_school, get_school_object, get_school
+from data import MenuData, create_context_data, get_school_object, get_school, IntervalError
 from data import DEPARTMENT_OBJECT, CLASS_OBJECT, WEEK_SCHEDULE_OBJECT, WEEK_OBJECT, DAY_OF_WEEK_OBJECT, LESSONS_OBJECT
 from database import save_user_class, get_user_class, save_error
 import messages
@@ -35,7 +35,7 @@ def keyboard_button_school(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = update.effective_user.id
     class_id = get_user_class(user_id)
     if class_id is not None:
-        school: School = get_school(context)
+        school: School = get_school(context, user_id)
         class_: SchoolClass = school.get_class_by_id(class_id)
         if class_ is not None:
             button = [InlineKeyboardButton(class_.name, callback_data=MenuData(class_.department.id, class_.id).to_string(CLASS_OBJECT))]
@@ -50,7 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = update.effective_user
     logging.info(f"command start for {user.id}")
     reply_markup: InlineKeyboardMarkup = keyboard_button_school(update, context)
-    create_school(context)
+    create_context_data(context, user.id)
 
     await update.message.reply_text(
         f"Привет {user.first_name}! \n{messages.HELLO_MESSAGE}\nИспользуй меню <Расписание> для получения текущего расписания уроков",
@@ -92,7 +92,7 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Протокол телеграмма не позволяет поменять текст сообщения на тот же самый текст - возникает ошибка Message is not modified: specified new message content
         message += ' ' + message
         logging.warning("message is same - change it")
-    await query.edit_message_text(text=messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
+    await query.edit_message_text(text=message, reply_markup=reply_markup)
     return START_ROUTES
 
 def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -284,6 +284,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     Обработка ошибок
     """
     logging.error("Exception:", exc_info=context.error)
+    if isinstance(context.error, IntervalError):
+        return
 
     tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
     tb_string = "".join(tb_list)
