@@ -46,7 +46,7 @@ class UserData:
         self.user_id: int = None
         self.seconds: int = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         """ 
         Преобразование в строку
         """
@@ -175,12 +175,22 @@ def get_school_object(class_name: str, menu_data: MenuData, context: ContextType
             user_data.last_class_name = class_name
             user_data.last_datetime = datetime.now()
         elif user_data.last_class_name == class_name and user_data.last_datetime is not None:
-            user_data.seconds = (datetime.now() - user_data.last_datetime).total_seconds()
-            if user_data.seconds < 10:
+            time_now = datetime.now()
+            time_diff = time_now - user_data.last_datetime
+            user_data.seconds = time_diff.total_seconds()
+            logging.debug(f"Same class_name. Time diff {user_data.seconds}")
+            logging.debug(f"Last usage {user_data.last_datetime.strftime('%d/%m/%y %H:%M')}")
+            logging.debug(f"New usage {time_now.strftime('%d/%m/%y %H:%M')}")
+            if user_data.seconds < 2:
                 logging.warning("Interval is too small")
                 raise IntervalError("Interval is too small")
+            else:
+                user_data.last_datetime = datetime.now()
         else:
-            user_data.seconds = None           
+            user_data.last_datetime = datetime.now()
+            user_data.last_class_name = class_name
+            user_data.seconds = None
+        context.user_data["UserData"] = user_data
 
     if class_name == DEPARTMENT_OBJECT:
         return school, None

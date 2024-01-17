@@ -87,12 +87,7 @@ async def school_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if error_message:
         await query.edit_message_text(error_message)
         return START_ROUTES
-    message = messages.CHOICE_DEPARTMENT_MESSAGE
-    if query.message.text == message:
-        # Протокол телеграмма не позволяет поменять текст сообщения на тот же самый текст - возникает ошибка Message is not modified: specified new message content
-        message += ' ' + message
-        logging.warning("message is same - change it")
-    await query.edit_message_text(text=message, reply_markup=reply_markup)
+    await query.edit_message_text(messages.CHOICE_DEPARTMENT_MESSAGE, reply_markup=reply_markup)
     return START_ROUTES
 
 def keyboard_button_classes(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -285,6 +280,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     """
     logging.error("Exception:", exc_info=context.error)
     if isinstance(context.error, IntervalError):
+        logging.error("Ignore exception IntervalError")
         return
 
     tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
@@ -298,7 +294,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         f"traceback = {tb_string}"
     logging.error(f"Error info:{message}")
     user_id = 0
-    if update.effective_user is not None:
+    if hasattr(update, 'effective_user') and update.effective_user is not None:
         user_id = update.effective_user.id
     save_error(user_id, tb_string, str(update_str), str(context.chat_data), str(context.user_data))
 
