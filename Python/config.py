@@ -46,10 +46,6 @@ def get_data_path() -> str:
     else:
         files = [f for f in os.listdir(db_path) if os.path.isfile(os.path.join(db_path, f))]
         logging.info(f"files:\n{files}")
-        # Временный код
-        if os.path.exists("/data"):
-            files = [f for f in os.listdir("/data") if os.path.isfile(f)]
-            logging.info(f"files:\n{files}")
     return db_path
 
 def main():

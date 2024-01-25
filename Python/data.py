@@ -57,6 +57,12 @@ class UserData:
             last_datetime = None
         return f"user_id={self.user_id} last_class_name={self.last_class_name} last_datetime={last_datetime} seconds={self.seconds}"
 
+    def __repr__(self) -> str:
+        """
+        Текстовое представление сущности объекта
+        """
+        return "{" + self.__str__() + "}"
+
 class IntervalError(Exception):
     """ Класс ошибки когда между запросами минимальный интервал"""
     def __init__(self, message):

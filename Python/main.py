@@ -8,6 +8,8 @@ import traceback
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler, PicklePersistence
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from warnings import filterwarnings
+from telegram.warnings import PTBUserWarning
 import config as cfg
 from schedule_parser import School, Department, SchoolClass
 from week_pdf_parser import Lesson, WeekSchedule
@@ -316,6 +318,8 @@ def main() -> None:
         .write_timeout(30) \
         .build()
 
+    filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
+    
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
