@@ -47,7 +47,7 @@ class UserData:
         self.seconds: int = None
 
     def __str__(self) -> str:
-        """ 
+        """
         Преобразование в строку
         """
         last_datetime = ""

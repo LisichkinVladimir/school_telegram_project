@@ -312,14 +312,14 @@ def main() -> None:
     logging.info("Start bot")
     db_path = cfg.get_data_path()
     file_path = f"{db_path}/bot_persistence"
-    persistence = PicklePersistence(filepath=file_path, update_interval = 20)
+    persistence = PicklePersistence(filepath=file_path, update_interval = 30)
     application = Application.builder().token(cfg.BOT_TOKEN).persistence(persistence)   \
         .read_timeout(30)  \
         .write_timeout(30) \
         .build()
 
     filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
-    
+
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
