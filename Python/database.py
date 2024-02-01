@@ -2,6 +2,7 @@
 Модуль работы с базой данных
 """
 import datetime
+from hashlib import md5
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
 from config import get_data_path
@@ -110,6 +111,11 @@ users = db_sql.Table(
     db_sql.Column("updated", db_sql.DateTime)                       # дата обновления
 )
 
+error_data = connection.execute(db_sql.text("select * from errors where created=0"))
+if "trace_hash" not in error_data.keys():
+    connection.execute(db_sql.text("alter table errors add trace_hash VARCHAR"))
+if "error_count" not in error_data.keys():
+    connection.execute(db_sql.text("alter table errors add error_count INTEGER"))
 # ошибки бота
 errors = db_sql.Table(
     "errors", meta,
@@ -118,7 +124,9 @@ errors = db_sql.Table(
     db_sql.Column("traceback", db_sql.String),                      # стек
     db_sql.Column("update_data", db_sql.String),                    # данные в update
     db_sql.Column("context_chat", db_sql.String),                   # данные в context.chat
-    db_sql.Column("context_user", db_sql.String)                    # данные в context.user
+    db_sql.Column("context_user", db_sql.String),                   # данные в context.user
+    db_sql.Column("trace_hash", db_sql.String),                     # Хеш стека
+    db_sql.Column("error_count", db_sql.Integer)                    # Количество повторений
 )
 
 meta.create_all(engine)
@@ -308,13 +316,33 @@ def save_error(user_id: int, traceback: str, update: str, context_chat: str, con
     def escape_sql_text(text: str) -> str:
         return text.replace("\\", "\\\\").replace("_", "\\_").replace("'", "''")
 
-    stmt = errors.insert().values(
-        created = datetime.datetime.now(),
-        user_id = user_id,
-        traceback = escape_sql_text(traceback),
-        update_data = escape_sql_text(update),
-        context_chat = escape_sql_text(context_chat),
-        context_user = escape_sql_text(context_user)
-    )
+    traceback = escape_sql_text(traceback)
+    data_for_hash = traceback.encode('utf-8', errors='ignore')
+    trace_hash = md5(data_for_hash).hexdigest()
+    error_data = session.query(errors).filter(errors.c.trace_hash == trace_hash).first()
+    if error_data is not None:
+        stmt = errors.update() \
+            .where(errors.c.trace_hash == trace_hash) \
+            .values(
+                {
+                    errors.c.created: datetime.datetime.now(),
+                    errors.c.user_id: user_id,
+                    errors.c.update_data: escape_sql_text(update),
+                    errors.c.context_chat: escape_sql_text(context_chat),
+                    errors.c.context_user: escape_sql_text(context_user),
+                    errors.c.error_count: error_data.error_count + 1
+                }
+            )
+    else:
+        stmt = errors.insert().values(
+            created = datetime.datetime.now(),
+            user_id = user_id,
+            traceback = traceback,
+            update_data = escape_sql_text(update),
+            context_chat = escape_sql_text(context_chat),
+            context_user = escape_sql_text(context_user),
+            trace_hash = trace_hash,
+            error_count = 1
+        )
     session.execute(stmt)
     session.commit()

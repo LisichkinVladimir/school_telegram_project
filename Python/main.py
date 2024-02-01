@@ -5,10 +5,10 @@ python-telegram-bot
 import sys
 import logging
 import traceback
+from warnings import filterwarnings
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler, PicklePersistence
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
 import config as cfg
 from schedule_parser import School, Department, SchoolClass

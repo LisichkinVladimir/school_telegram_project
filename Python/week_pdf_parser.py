@@ -344,10 +344,10 @@ class WeekSchedule:
                 if match:
                     office2 = lesson[match.start():match.end()].strip()
                     lesson = lesson.replace(office2, "").strip()
-                    office = office + office2 
+                    office = office + office2
 
         return (office, lesson)
-    
+
     def __parse_teacher(self, lesson)-> tuple:
         """
         разбор фамилии учителя"""

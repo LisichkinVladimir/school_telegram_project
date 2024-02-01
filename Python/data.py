@@ -187,7 +187,7 @@ def get_school_object(class_name: str, menu_data: MenuData, context: ContextType
             logging.debug(f"Same class_name. Time diff {user_data.seconds}")
             logging.debug(f"Last usage {user_data.last_datetime.strftime('%d/%m/%y %H:%M')}")
             logging.debug(f"New usage {time_now.strftime('%d/%m/%y %H:%M')}")
-            if user_data.seconds < 2:
+            if user_data.seconds < 4:
                 logging.warning("Interval is too small")
                 raise IntervalError("Interval is too small")
             else:
