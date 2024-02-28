@@ -517,10 +517,17 @@ class WeekSchedule:
         if self.__school_class is not None:
             url = self.__school_class.link
         logging.info(f"get {url}")
-        response = requests.get(url)
-        if response.status_code != 200:
-            self.__last_parse_error = f"Error get {url}. error code {url}"
-            logging.error(self.__last_parse_error)
+        try:
+            response = requests.get(url, timeout = 20)
+            if response.status_code != 200:
+                self.__last_parse_error = f"Error get {url}. error code {url}"
+                logging.error(self.__last_parse_error)
+                return False
+        except requests.exceptions.ReadTimeout:
+            self.__last_parse_error = f"Error get {url}. Timeout error"
+            return False
+        except requests.exceptions.ConnectTimeout:
+            self.__last_parse_error = f"Error get {url}. Connection timeout error"
             return False
 
         # Вычисление хэша
