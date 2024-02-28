@@ -176,6 +176,9 @@ class School:
         except requests.exceptions.ReadTimeout:
             #ReadTimeout
             logging.error("Timeout error. Try get data from database")
+        except requests.exceptions.ConnectTimeout:
+            #ReadTimeout
+            logging.error("Connection timeout error. Try get data from database")
 
         if self.__hash == new_hash and new_hash is not None:
             # разбор не нужен - хэш совпадает - значит данные не изменились
