@@ -166,19 +166,16 @@ class School:
         """
         new_hash = None
         try:
-            response: requests.models.Response = requests.get(self.__url, timeout = 10)
+            timeouts = (6, 10) # (conn_timeout, read_timeout)
+            response: requests.models.Response = requests.get(self.__url, timeout = timeouts)
             if response.status_code != 200:
                 logging.error(f"Error get {self.__url}. error code {response.status_code}")
                 return False
             logging.info(f"get {response.text[:25]}...\n")
             new_hash = self.get_hash(response)
             logging.info(f"hash {new_hash}")
-        except requests.exceptions.ReadTimeout:
-            #ReadTimeout
-            logging.error("Timeout error. Try get data from database")
-        except requests.exceptions.ConnectTimeout:
-            #ReadTimeout
-            logging.error("Connection timeout error. Try get data from database")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error {type(e)} {e}.  Try get data from database")
 
         if self.__hash == new_hash and new_hash is not None:
             # разбор не нужен - хэш совпадает - значит данные не изменились
