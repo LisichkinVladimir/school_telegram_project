@@ -526,6 +526,7 @@ class WeekSchedule:
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.7 (KHTML, like Gecko) Version/11.0.2 Safari/604.4.7"
             ]
             headers = {"User-Agent": random.choice(user_agents)}
+            logging.info(f"Use agent {headers}")
             response = requests.get(url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
                 self.__last_parse_error = f"Error get {url}. error code {url}"
