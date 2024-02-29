@@ -9,6 +9,7 @@ from datetime import datetime
 from hashlib import md5
 from urllib.parse import unquote
 import requests
+import random
 from PyPDF2 import PdfReader
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTPage, LTFigure
@@ -246,7 +247,7 @@ class DayOfWeek:
                             self.__row_index = -1
                         if self.__column_index != value[1]:
                             self.__column_index = -1
-        # Сортировка ао номеру дня недели от Пн-Вс
+        # Сортировка по номеру дня недели от Пн-Вс
         week_name_indexes = {}
         week_number_indexes = {}
         sorted_index = sorted(self.__week_number_indexes.items())
@@ -257,8 +258,8 @@ class DayOfWeek:
             week_name_indexes[week_name] = position
             week_number_indexes[index] = week_name
 
-        self.__week_name_indexes: week_name_indexes
-        self.__week_number_indexes: week_number_indexes
+        self.__week_name_indexes = week_name_indexes
+        self.__week_number_indexes = week_number_indexes
 
     def get_day_of_week_by_row(self, row_index: int) -> str:
         """
@@ -519,7 +520,13 @@ class WeekSchedule:
         logging.info(f"get {url}")
         try:
             timeouts = (6, 20) # (conn_timeout, read_timeout)
-            response = requests.get(url, timeout = timeouts)
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36 OPR/43.0.2442.991"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.7 (KHTML, like Gecko) Version/11.0.2 Safari/604.4.7"
+            ]
+            headers = {"User-Agent": random.choice(user_agents)}
+            response = requests.get(url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
                 self.__last_parse_error = f"Error get {url}. error code {url}"
                 logging.error(self.__last_parse_error)
@@ -528,6 +535,7 @@ class WeekSchedule:
             logging.error(f"Error {type(e)} {e}")
             return False
 
+        # TODO добавить кеширование в базе данных
         # Вычисление хэша
         new_hash = md5(response.content).hexdigest()
         logging.info(f"hash {new_hash}")

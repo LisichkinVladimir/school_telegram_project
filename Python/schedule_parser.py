@@ -6,6 +6,7 @@ import re
 import logging
 from hashlib import md5
 import requests
+import random
 from bs4 import BeautifulSoup
 import config as cfg
 from week_pdf_parser import WeekSchedule, Lesson
@@ -166,8 +167,14 @@ class School:
         """
         new_hash = None
         try:
-            timeouts = (6, 10) # (conn_timeout, read_timeout)
-            response: requests.models.Response = requests.get(self.__url, timeout = timeouts)
+            timeouts = (5, 10) # (conn_timeout, read_timeout)
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36 OPR/43.0.2442.991"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.7 (KHTML, like Gecko) Version/11.0.2 Safari/604.4.7"
+            ]
+            headers = {"User-Agent": random.choice(user_agents)}
+            response: requests.models.Response = requests.get(self.__url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
                 logging.error(f"Error get {self.__url}. error code {response.status_code}")
                 return False
@@ -175,7 +182,7 @@ class School:
             new_hash = self.get_hash(response)
             logging.info(f"hash {new_hash}")
         except requests.exceptions.RequestException as e:
-            logging.error(f"Error {type(e)} {e}.  Try get data from database")
+            logging.error(f"Error {type(e)} {e}.\nTry get data from database")
 
         if self.__hash == new_hash and new_hash is not None:
             # разбор не нужен - хэш совпадает - значит данные не изменились
