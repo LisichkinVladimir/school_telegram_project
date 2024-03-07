@@ -5,8 +5,8 @@ import sys
 import re
 import logging
 from hashlib import md5
-import requests
 import random
+import requests
 from bs4 import BeautifulSoup
 import config as cfg
 from week_pdf_parser import WeekSchedule, Lesson
@@ -174,7 +174,7 @@ class School:
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.7 (KHTML, like Gecko) Version/11.0.2 Safari/604.4.7"
             ]
             headers = {"User-Agent": random.choice(user_agents)}
-            logging.info(f"Use agent {headers}")
+            logging.info(f"Get from {self.__url}. Use agent {headers}")
             response: requests.models.Response = requests.get(self.__url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
                 logging.error(f"Error get {self.__url}. error code {response.status_code}")
@@ -187,6 +187,7 @@ class School:
 
         if self.__hash == new_hash and new_hash is not None:
             # разбор не нужен - хэш совпадает - значит данные не изменились
+            logging.info("Hash not changed - used saved data")
             return True
 
         result = load_from_db(self, new_hash)

@@ -8,8 +8,8 @@ import re
 from datetime import datetime
 from hashlib import md5
 from urllib.parse import unquote
-import requests
 import random
+import requests
 from PyPDF2 import PdfReader
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTPage, LTFigure
@@ -526,7 +526,7 @@ class WeekSchedule:
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.7 (KHTML, like Gecko) Version/11.0.2 Safari/604.4.7"
             ]
             headers = {"User-Agent": random.choice(user_agents)}
-            logging.info(f"Use agent {headers}")
+            logging.info(f"Get from {url}. Use agent {headers}")
             response = requests.get(url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
                 self.__last_parse_error = f"Error get {url}. error code {url}"
@@ -541,6 +541,7 @@ class WeekSchedule:
         new_hash = md5(response.content).hexdigest()
         logging.info(f"hash {new_hash}")
         if self.__hash == new_hash:
+            logging.info("Hash not changed - used saved data")
             return self.__last_parse_result
 
         self.__hash = new_hash
