@@ -536,7 +536,6 @@ class WeekSchedule:
             logging.error(f"Error {type(e)} {e}")
             return False
 
-        # TODO добавить кеширование в базе данных
         # Вычисление хэша
         new_hash = md5(response.content).hexdigest()
         logging.info(f"hash {new_hash}")
@@ -544,6 +543,8 @@ class WeekSchedule:
             logging.info("Hash not changed - used saved data")
             return self.__last_parse_result
 
+        # TODO добавить кеширование в базе данных load_from_db
+        # TODO перенести ниже лежащий код в процедуру load_from_url
         self.__hash = new_hash
         self.__lesson_dict = {}
         self.__created = None
