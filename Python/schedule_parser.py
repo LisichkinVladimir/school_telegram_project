@@ -146,6 +146,10 @@ class School:
         self.__id: int = None
         # Название текущего расписания
         self.__schedule_name: str = None
+        # Флаг был ли последний разбор успешен
+        self.__last_parse_result: bool = False
+        # Текст ошибки последнего разбора
+        self.__last_parse_info: str = None
 
     def get_hash(self, response: requests.models.Response) -> str:
         """
@@ -177,27 +181,35 @@ class School:
             logging.info(f"Get from {self.__url}. Use agent {headers}")
             response: requests.models.Response = requests.get(self.__url, timeout = timeouts, headers=headers)
             if response.status_code != 200:
-                logging.error(f"Error get {self.__url}. error code {response.status_code}")
-                return False
+                self.__last_parse_info = f"Error get {self.__url}. error code {response.status_code}"
+                logging.error(self.__last_parse_info)
+                self.__last_parse_result = False
+                return self.__last_parse_result
             logging.info(f"get {response.text[:25]}...\n")
             new_hash = self.get_hash(response)
             logging.info(f"hash {new_hash}")
         except requests.exceptions.RequestException as e:
-            logging.error(f"Error {type(e)} {e}.\nTry get data from database")
+            self.__last_parse_info = f"Error {type(e)} {e}.\nTry get data from database"
+            logging.error(self.__last_parse_info)
 
         if self.__hash == new_hash and new_hash is not None:
             # разбор не нужен - хэш совпадает - значит данные не изменились
-            logging.info("Hash not changed - used saved data")
-            return True
+            self.__last_parse_info = "Hash not changed - used saved data"
+            logging.info(self.__last_parse_info)
+            self.__last_parse_result = True
+            return self.__last_parse_result
 
-        result = load_from_db(self, new_hash)
-        if not result and new_hash is not None:
+        self.__last_parse_result = load_from_db(self, new_hash)
+        if self.__last_parse_result:
+            # Данные успешно загружены из БД - Hash БД и Hash из Internet совпал
+            self.__last_parse_info = "Hash in Database not changed"
+        elif not self.__last_parse_result and new_hash is not None:
             # Данных в базе данных нет - разбираем данные страницы
-            result = self.load_from_url(new_hash, response)
-            if result:
+            self.__last_parse_result = self.load_from_url(new_hash, response)
+            if self.__last_parse_result:
                 # записываем созданные объекты в базу
                 save_to_db(self)
-            return result
+        return self.__last_parse_result
 
     def load_from_url(self, new_hash: str, response: requests.models.Response) -> bool:
         """
@@ -341,6 +353,11 @@ class School:
     def url(self) -> str:
         """ Свойство url страницы школы """
         return self.__url
+
+    @property
+    def last_parse_info(self) -> str:
+        """ Текст ошибки последнего разбора """
+        return self.__last_parse_info
 
 def main():
     """

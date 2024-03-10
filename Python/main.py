@@ -6,6 +6,7 @@ import sys
 import logging
 import traceback
 from warnings import filterwarnings
+from datetime import datetime
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler, PicklePersistence
 from telegram import User, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -300,6 +301,17 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         user_id = update.effective_user.id
     save_error(user_id, tb_string, str(update_str), str(context.chat_data), str(context.user_data))
 
+async def job_handler(context: ContextTypes.DEFAULT_TYPE)-> None:
+    """
+    Периодически выполняемое задание
+    """
+    now = datetime.now()
+    current_time = now.strftime("%d/%m/%Y %H:%M:%S")
+    logging.info(f"job_handler {current_time}")
+    school: School = get_school(context, 0)
+    parse_info = school.last_parse_info
+    logging.info(f"last parse error: {parse_info}")
+
 def main() -> None:
     """
     Запуск бота
@@ -312,7 +324,7 @@ def main() -> None:
     logging.info("Start bot")
     db_path = cfg.get_data_path()
     file_path = f"{db_path}/bot_persistence"
-    persistence = PicklePersistence(filepath=file_path, update_interval = 30)
+    persistence = PicklePersistence(filepath=file_path, update_interval = 50)
     application = Application.builder().token(cfg.BOT_TOKEN).persistence(persistence)   \
         .read_timeout(30)  \
         .write_timeout(30) \
@@ -337,6 +349,8 @@ def main() -> None:
         persistent=True,
     )
     application.add_handler(conv_handler)
+    job_queue = application.job_queue
+    job_queue.run_repeating(job_handler, interval=60*60*12, first=10)
 
     # обработчик ошибок
     application.add_error_handler(error_handler)
