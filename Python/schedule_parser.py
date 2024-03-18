@@ -115,7 +115,7 @@ class Department:
     def id(self) -> int:
         """ уникальный идентификатор """
         return self.__id
-    
+
     @property
     def school(self):
         """ ссылка на школу """

@@ -3,6 +3,7 @@
 """
 import datetime
 from hashlib import md5
+import logging
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
 from config import get_data_path
@@ -150,15 +151,15 @@ def delete_old_schedule(school_hash: str) -> None:
         try:
             # удалить lessons - уроки
             sql = "from lessons where week_schedule_hash in " + \
-                "(select hash from week_schedules where schedule_hash = '" + schedule_hash + "')"            
-            lessons = connection.execute(db_sql.text("select * " + sql))
-            if lessons and len(lessons.all()) > 0:
+                "(select hash from week_schedules where schedule_hash = '" + schedule_hash + "')"
+            lessons_data = connection.execute(db_sql.text("select * " + sql))
+            if lessons_data and len(lessons_data.all()) > 0:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
             # удалить week_schedules - расписания на неделю
             sql = "from week_schedules where schedule_hash = '" + schedule_hash + "'"
-            week_schedules = connection.execute(db_sql.text("select * " + sql))
-            if week_schedules and len(connection.all()) > 0:
+            schedule_data = connection.execute(db_sql.text("select * " + sql))
+            if schedule_data and len(week_schedules.all()) > 0:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
         except:
@@ -278,10 +279,12 @@ def load_from_db(school, new_hash: str) -> bool:
             # Данные уже загружались
             return True
     # Проверяем расписание
+    logging.info(f"find in schedules hash = {new_hash}")
     schedule_data = session.query(schedules) \
         .filter(schedules.c.hash == new_hash) \
         .filter(schedules.c.deleted is not None) \
         .first()
+    logging.info(f"schedule_data = {schedule_data}")
     if schedule_data is None:
         return False
 
@@ -427,8 +430,8 @@ def load_pdf_from_db(week_schedule, new_hash: str) -> bool:
         .filter(week_schedules.c.parse_result == True) \
         .first()
     if schedule_data is None:
-        return False        
-    
+        return False
+
     # Загрузка WeekSchedule
     week_schedule.created = schedule_data.created
     week_schedule.hash = schedule_data.hash
@@ -439,9 +442,9 @@ def load_pdf_from_db(week_schedule, new_hash: str) -> bool:
     sql = "select l.*, i.week, i.hour_start, i.day_of_week, i.day_number from lessons l join lessons_ident i on l.ident_id=i.id " + \
         "where l.week_schedule_hash = '" + schedule_data.hash + "' " + \
         "order by i.week, i.day_number, i.hour_start, l.hour_end, l.is_group"
-    lessons = connection.execute(db_sql.text(sql))
+    lessons_data = connection.execute(db_sql.text(sql))
     has_lesson = False
-    for lesson_data in lessons:
+    for lesson_data in lessons_data:
         lesson_ident = LessonIdent(lesson_data.week, lesson_data.hour_start, lesson_data.day_of_week, lesson_data.day_number)
         new_lesson = Lesson(
                 ident = lesson_ident,

@@ -333,7 +333,7 @@ class WeekSchedule:
         self.__lesson_dict = {}
 
     def add_lesson(self, lesson_ident: LessonIdent, new_lesson: Lesson):
-        """        
+        """
         Добавить новый урок
         """
         if lesson_ident not in self.__lesson_dict:
@@ -344,7 +344,7 @@ class WeekSchedule:
             lesson.groups.append(new_lesson)
 
     def add_group_lesson(self, lesson_ident: LessonIdent, new_lesson: Lesson):
-        """        
+        """
         Добавить новый урок
         """
         lesson: Lesson = self.__lesson_dict[lesson_ident]
@@ -576,6 +576,9 @@ class WeekSchedule:
         return self.__last_parse_result
 
     def load_pdf_from_url(self, new_hash: str, url: str, response: requests.models.Response) -> bool:
+        """
+        Процедура разбора pdf расписания
+        """
         self.__hash = new_hash
         self.__lesson_dict = {}
         self.__created = None
@@ -688,7 +691,7 @@ class WeekSchedule:
     def hash(self) -> str:
         """ Свойство хэш pdf """
         return self.__hash
-    
+
     @hash.setter
     def hash(self, value: str):
         """ Setter свойства хэш pdf """
@@ -703,7 +706,7 @@ class WeekSchedule:
     def created(self):
         """ Свойство дата создания pdf """
         return self.__created
-    
+
     @created.setter
     def created(self, value):
         """ Setter свойства дата создания pdf """
