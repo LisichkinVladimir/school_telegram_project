@@ -270,24 +270,28 @@ def load_from_db(school, new_hash: str) -> bool:
     Процедура загрузки расписания из базы
     """
     from schedule_parser import Department, SchoolClass
+    schedule_data_for_hash = None
     if school.hash is not None and school.hash != '':
-        schedule_data = session.query(schedules) \
+        schedule_data_for_hash = session.query(schedules) \
             .filter(schedules.c.hash == school.hash) \
             .filter(schedules.c.deleted is not None) \
             .first()
-        if schedule_data is not None:
-            # Данные уже загружались
-            return True
-    # Проверяем расписание
+        if schedule_data_for_hash is None:
+            # Данные еше не загружались
+            return False
+    # Проверяем по new_hash
     logging.info(f"find in schedules hash = {new_hash}")
-    schedule_data = session.query(schedules) \
+    schedule_data_for_new = session.query(schedules) \
         .filter(schedules.c.hash == new_hash) \
         .filter(schedules.c.deleted is not None) \
         .first()
-    logging.info(f"schedule_data = {schedule_data}")
-    if schedule_data is None:
+    if schedule_data_for_new is None:
         return False
+    if schedule_data_for_hash is not None:
+        # Данные уже загружались
+        return True
 
+    schedule_data = schedule_data_for_new
     school.schedule_name = schedule_data.name
 
     school_data = session.query(schools) \
