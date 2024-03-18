@@ -83,7 +83,7 @@ class Department:
     """
     Класс подразделение (корпус) школы
     """
-    def __init__(self, name: str):
+    def __init__(self, name: str, school):
         """
         Конструктор класса
         name: название территории расписания
@@ -92,6 +92,8 @@ class Department:
         self.__name: str = name
         # список классов
         self.__classes: list = []
+        # ссылка на школу
+        self.__school = school
         # идентификатор
         self.__id = hash(self)
 
@@ -113,6 +115,11 @@ class Department:
     def id(self) -> int:
         """ уникальный идентификатор """
         return self.__id
+    
+    @property
+    def school(self):
+        """ ссылка на школу """
+        return self.__school
 
     def get_class_by_id(self, class_id: int) -> SchoolClass:
         """ Получить класс по идентификатору"""
@@ -207,8 +214,11 @@ class School:
             # Данных в базе данных нет - разбираем данные страницы
             self.__last_parse_result = self.load_from_url(new_hash, response)
             if self.__last_parse_result:
+                self.__last_parse_info = "Successful parse data from url"
                 # записываем созданные объекты в базу
                 save_to_db(self)
+            else:
+                self.__last_parse_info = "Error parse data from url"
         return self.__last_parse_result
 
     def load_from_url(self, new_hash: str, response: requests.models.Response) -> bool:
@@ -249,7 +259,7 @@ class School:
         for h3 in h3_list:
             if '<h3 class="toggle-heading" style="text-align: center;"><span style="font-size' in str(h3):
                 logging.info(f"Department {h3.text}....")
-                department = Department(h3.text)
+                department = Department(h3.text, self)
 
                 # Поиск таблицы с расписаниями классов
                 for sibling in h3.next_siblings:
@@ -394,9 +404,11 @@ def main():
                 print(f"!!!!!!!! Ошибка разбора {class_.link} - {week_schedule.last_parse_error}")
                 error_list.append(f"!!!!!!!! Ошибка разбора {class_.link} - {week_schedule.last_parse_error}")
             else:
+                week_schedule_str = ""
                 for week in week_schedule.week_list():
                     for day_of_week in week_schedule.day_of_week_list(week):
                         print(f"week-{week} day_of_week-{day_of_week}")
+                        week_schedule_str += f"week-{week} day_of_week-{day_of_week}\n"
                         lesson: Lesson
                         for lesson in week_schedule.lesson_list(week, day_of_week):
                             lesson_id = lesson.id
@@ -406,6 +418,29 @@ def main():
                                 id_dict[lesson_id] = 1
                             lesson_string = "[" + str(lesson_id) + "]" + lesson.to_str()
                             print(lesson_string)
+                            week_schedule_str += f"{lesson_string}\n"
+                ################################################################
+                # Создаем още один объект WeekSchedule для проверки
+                if week_schedule.last_parse_error == "Lessons successful loaded from url":
+                    use_db_cash = True
+                elif week_schedule.last_parse_error == "Lessons successful loaded from Db":
+                    use_db_cash = True
+                else:
+                    print(f"Unknown error {week_schedule.last_parse_error}")
+                week_schedule = WeekSchedule(class_)
+                week_schedule.parse(use_db_cash = use_db_cash)
+                week_schedule_str2 = ""
+                for week in week_schedule.week_list():
+                    for day_of_week in week_schedule.day_of_week_list(week):
+                        week_schedule_str2 += f"week-{week} day_of_week-{day_of_week}\n"
+                        lesson: Lesson
+                        for lesson in week_schedule.lesson_list(week, day_of_week):
+                            lesson_id = lesson.id
+                            lesson_string = "[" + str(lesson_id) + "]" + lesson.to_str()
+                            week_schedule_str2 += f"{lesson_string}\n"
+                if week_schedule_str != week_schedule_str2:
+                    print("Schedule from db and from url different!!!!!!!!!!!!!")
+
         print("\n")
     print("------------------duplicate--------------------------")
     for key, value in id_dict.items():

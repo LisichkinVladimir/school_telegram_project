@@ -79,6 +79,11 @@ lessons_ident = db_sql.Table(
     db_sql.Column("day_number", db_sql.Integer)				        # номер дня недели
 )
 
+connection = engine.connect()
+lesson_data = connection.execute(db_sql.text("select * from lessons where id=-1"))
+if "is_group" not in lesson_data.keys():
+    connection.execute(db_sql.text("alter table lessons add is_group BOOLEAN"))
+
 # Список уроков
 lessons = db_sql.Table(
     "lessons", meta,
@@ -92,15 +97,16 @@ lessons = db_sql.Table(
     db_sql.Column("office", db_sql.String),                         # кабинет
     db_sql.Column("group_name", db_sql.String),                     # группа
     db_sql.Column("teacher", db_sql.String),                        # преподаватель
-    db_sql.Column("row_data", db_sql.String)                        # сырые данных
+    db_sql.Column("row_data", db_sql.String),                       # сырые данных
+    db_sql.Column("is_group", db_sql.Boolean)                       # Признак группы
 )
 
-connection = engine.connect()
 user_data = connection.execute(db_sql.text("select * from users where id=-1"))
 if "name" not in user_data.keys():
     connection.execute(db_sql.text("alter table users add name VARCHAR"))
 if "updated" not in user_data.keys():
     connection.execute(db_sql.text("alter table users add updated DATETIME"))
+
 # Список пользователей
 users = db_sql.Table(
     "users", meta,
@@ -130,6 +136,34 @@ errors = db_sql.Table(
 )
 
 meta.create_all(engine)
+
+def delete_old_schedule(school_hash: str) -> None:
+    """"
+    Удаление старых расписаний и уроков
+    """
+    # Удалим лишнее в lessons_ident/lessons/week_schedules
+    schedule_data = session.query(schedules) \
+        .filter(schedules.c.hash != school_hash) \
+        .filter(schedules.c.deleted != None)
+    for schedule in schedule_data:
+        schedule_hash = schedule.hash
+        try:
+            # удалить lessons - уроки
+            sql = "from lessons where week_schedule_hash in " + \
+                "(select hash from week_schedules where schedule_hash = '" + schedule_hash + "')"            
+            lessons = connection.execute(db_sql.text("select * " + sql))
+            if lessons and len(lessons.all()) > 0:
+                connection.execute(db_sql.text("delete " + sql))
+                session.commit()
+            # удалить week_schedules - расписания на неделю
+            sql = "from week_schedules where schedule_hash = '" + schedule_hash + "'"
+            week_schedules = connection.execute(db_sql.text("select * " + sql))
+            if week_schedules and len(connection.all()) > 0:
+                connection.execute(db_sql.text("delete " + sql))
+                session.commit()
+        except:
+            # TODO логировать ошибки
+            pass
 
 def save_to_db(school) -> None:
     """
@@ -227,12 +261,15 @@ def save_to_db(school) -> None:
     session.execute(stmt)
     session.commit()
 
+    # Удалим лишнее в lessons_ident/lessons/week_schedules
+    delete_old_schedule(school.hash)
+
 def load_from_db(school, new_hash: str) -> bool:
     """
     Процедура загрузки расписания из базы
     """
     from schedule_parser import Department, SchoolClass
-    if new_hash is not None:
+    if school.hash is not None and school.hash != '':
         schedule_data = session.query(schedules) \
             .filter(schedules.c.hash == school.hash) \
             .filter(schedules.c.deleted is not None) \
@@ -240,6 +277,7 @@ def load_from_db(school, new_hash: str) -> bool:
         if schedule_data is not None:
             # Данные уже загружались
             return True
+    # Проверяем расписание
     schedule_data = session.query(schedules) \
         .filter(schedules.c.hash == new_hash) \
         .filter(schedules.c.deleted is not None) \
@@ -262,7 +300,7 @@ def load_from_db(school, new_hash: str) -> bool:
         .filter(departments.c.deleted is not None) \
         .order_by(departments.c.sequence)
     for department_data in department_list:
-        department: Department = Department(department_data.name)
+        department: Department = Department(department_data.name, school)
         # Загрузка классов
         school_list = session.query(classes) \
             .filter(classes.c.department_id == department.id) \
@@ -275,6 +313,153 @@ def load_from_db(school, new_hash: str) -> bool:
 
     school.hash = new_hash
     return True
+
+def save_pdf_to_db(week_schedule) -> bool:
+    """
+    Процедура сохранения pdf расписания в базе данных
+    """
+
+    def save_lesson(lesson, is_group: bool = False):
+        """
+        Сохранение данных об уроке
+        """
+        if session.query(lessons_ident).filter_by(id = lesson.ident.id).first() is not None:
+            stmt = lessons_ident.update().where(lessons_ident.c.id == lesson.ident.id) \
+                .values(
+                    week = lesson.ident.week,
+                    hour_start = lesson.ident.hour_start,
+                    day_of_week = lesson.ident.day_of_week,
+                    day_number = lesson.ident.day_of_week_number
+                )
+        else:
+            stmt = lessons_ident.insert().values(
+                    id = lesson.ident.id,
+                    week = lesson.ident.week,
+                    hour_start = lesson.ident.hour_start,
+                    day_of_week = lesson.ident.day_of_week,
+                    day_number = lesson.ident.day_of_week_number
+            )
+        session.execute(stmt)
+
+        if session.query(lessons).filter_by(id = lesson.id).first() is not None:
+            stmt = lessons.update().where(lessons.c.id == lesson.id) \
+                .values(
+                    ident_id = lesson.ident.id,
+                    week_schedule_hash = week_schedule.hash,
+                    hour_end = lesson.hour_end,
+                    name = lesson.name,
+                    office = lesson.office,
+                    group_name = lesson.group,
+                    teacher = lesson.teacher,
+                    row_data = lesson.row_data,
+                    is_group = is_group
+                )
+        else:
+            stmt = lessons.insert().values(
+                    id = lesson.id,
+                    ident_id = lesson.ident.id,
+                    week_schedule_hash = week_schedule.hash,
+                    hour_end = lesson.hour_end,
+                    name = lesson.name,
+                    office = lesson.office,
+                    group_name = lesson.group,
+                    teacher = lesson.teacher,
+                    row_data = lesson.row_data,
+                    is_group = is_group
+            )
+        session.execute(stmt)
+
+        # Сохранение групп 
+        for lesson in lesson.groups:
+            save_lesson(lesson, is_group = True)
+
+    if week_schedule.school_class is None:
+        return False
+    # Добавление/изменение недельного расписания
+    last_parse_result = None
+    if week_schedule.last_parse_error:
+        last_parse_result = week_schedule.last_parse_result
+    if session.query(week_schedules).filter_by(hash = week_schedule.hash).first() is not None:
+        stmt = week_schedules.update().where(week_schedules.c.hash == week_schedule.hash).values(
+            schedule_hash = week_schedule.school_class.department.school.hash, 
+            class_id = week_schedule.school_class.id,
+            created = week_schedule.created,
+            parse_result = last_parse_result,
+            parse_error = week_schedule.last_parse_error)
+    else:
+        stmt = week_schedules.insert().values(
+            hash = week_schedule.hash,
+            schedule_hash = week_schedule.school_class.department.school.hash,
+            class_id = week_schedule.school_class.id,
+            created = week_schedule.created,
+            parse_result = last_parse_result,
+            parse_error = week_schedule.last_parse_error
+        )
+    session.execute(stmt)
+
+    # Записать данные в таблицу lessons/lessons_ident
+    for week in week_schedule.week_list():
+        for day_of_week in week_schedule.day_of_week_list(week):
+            for lesson in week_schedule.lesson_list(week, day_of_week):
+                save_lesson(lesson)
+
+    session.commit()
+
+    # Удалим лишнее в lessons_ident/lessons/week_schedules
+    delete_old_schedule(week_schedule.school_class.department.school.hash)
+
+
+def load_pdf_from_db(week_schedule, new_hash: str) -> bool:
+    """
+    Процедура загрузки pdf расписания из базы
+    """
+    from week_pdf_parser import LessonIdent, Lesson
+    if week_schedule.hash is not None and week_schedule.hash != '':
+        schedule_data = session.query(week_schedules) \
+            .filter(week_schedules.c.hash == week_schedule.hash) \
+            .filter(week_schedules.c.parse_result == True) \
+            .first()
+        if schedule_data is not None:
+            # Данные уже загружались
+            return True
+    schedule_data = session.query(week_schedules) \
+        .filter(week_schedules.c.hash == new_hash) \
+        .filter(week_schedules.c.parse_result == True) \
+        .first()
+    if schedule_data is None:
+        return False        
+    
+    # Загрузка WeekSchedule
+    week_schedule.created = schedule_data.created
+    week_schedule.hash = schedule_data.hash
+    week_schedule.last_parse_result = schedule_data.parse_result
+    week_schedule.last_parse_error = schedule_data.parse_error
+
+    # Загрузка lesson
+    sql = "select l.*, i.week, i.hour_start, i.day_of_week, i.day_number from lessons l join lessons_ident i on l.ident_id=i.id " + \
+        "where l.week_schedule_hash = '" + schedule_data.hash + "' " + \
+        "order by i.week, i.day_number, i.hour_start, l.hour_end, l.is_group"
+    lessons = connection.execute(db_sql.text(sql))
+    has_lesson = False
+    for lesson_data in lessons:
+        lesson_ident = LessonIdent(lesson_data.week, lesson_data.hour_start, lesson_data.day_of_week, lesson_data.day_number)
+        new_lesson = Lesson(
+                ident = lesson_ident,
+                name = lesson_data.name,
+                office = lesson_data.office,
+                group = lesson_data.group_name,
+                teacher = lesson_data.teacher,
+                class_name = None if week_schedule.school_class is None else week_schedule.school_class.name,
+                row_data = lesson_data.row_data)
+        if lesson_data.hour_end is not None:
+            new_lesson.hour_end = lesson_data.hour_end
+        if lesson_data.is_group is None or lesson_data.is_group == False:
+            week_schedule.add_lesson(lesson_ident, new_lesson)
+        else:
+            week_schedule.add_group_lesson(lesson_ident, new_lesson)
+        has_lesson = True
+
+    return has_lesson
 
 def save_user_class(user_id: int, class_id: int, user_name: str) -> None:
     """

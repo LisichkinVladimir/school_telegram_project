@@ -17,6 +17,7 @@ from telegram.constants import ParseMode
 import pdfplumber
 from cache_func import timed_lru_cache, hash_string
 import config as cfg
+from database import load_pdf_from_db, save_pdf_to_db
 
 class LessonIdent:
     """
@@ -331,6 +332,24 @@ class WeekSchedule:
         self.__last_parse_error = None
         self.__lesson_dict = {}
 
+    def add_lesson(self, lesson_ident: LessonIdent, new_lesson: Lesson):
+        """        
+        Добавить новый урок
+        """
+        if lesson_ident not in self.__lesson_dict:
+            self.__lesson_dict[lesson_ident] = new_lesson
+        else:
+            # Разбиение урока на группы
+            lesson: Lesson = self.__lesson_dict[lesson_ident]
+            lesson.groups.append(new_lesson)
+
+    def add_group_lesson(self, lesson_ident: LessonIdent, new_lesson: Lesson):
+        """        
+        Добавить новый урок
+        """
+        lesson: Lesson = self.__lesson_dict[lesson_ident]
+        lesson.groups.append(new_lesson)
+
     def __parse_office(self, lesson: str) -> tuple:
         """
         Разбираем кабинет в названии урока
@@ -410,12 +429,7 @@ class WeekSchedule:
             teacher = teacher,
             class_name = None if self.__school_class is None else self.__school_class.name,
             row_data = row_data)
-        if lesson_ident not in self.__lesson_dict:
-            self.__lesson_dict[lesson_ident] = new_lesson
-        else:
-            # Разбиение урока на группы
-            lesson: Lesson = self.__lesson_dict[lesson_ident]
-            lesson.groups.append(new_lesson)
+        self.add_lesson(lesson_ident, new_lesson)
 
     def __parse_week_by_row(self, table: list, day_of_week: DayOfWeek, class_name: str = None) -> bool:
         """
@@ -510,7 +524,7 @@ class WeekSchedule:
         return self.__last_parse_result
 
     @timed_lru_cache(60*60*24)
-    def parse(self, url = None) -> bool:
+    def parse(self, url = None, use_db_cash: bool = True) -> bool:
         """
         Процедура разбора url расписания
         """
@@ -539,12 +553,29 @@ class WeekSchedule:
         # Вычисление хэша
         new_hash = md5(response.content).hexdigest()
         logging.info(f"hash {new_hash}")
-        if self.__hash == new_hash:
-            logging.info("Hash not changed - used saved data")
+        if self.__hash == new_hash and use_db_cash:
+            self.__last_parse_error = "Hash not changed - used saved data"
+            logging.info(self.__last_parse_error)
             return self.__last_parse_result
 
-        # TODO добавить кеширование в базе данных load_from_db
-        # TODO перенести ниже лежащий код в процедуру load_from_url
+        if use_db_cash:
+            self.__last_parse_result = load_pdf_from_db(self, new_hash)
+            if self.__last_parse_result:
+                self.__last_parse_error = "Lessons successful loaded from Db"
+                logging.info(self.__last_parse_error)
+        else:
+            self.__last_parse_result = False
+        if not self.__last_parse_result and new_hash is not None:
+            # Данных в базе данных нет - разбираем данные страницы
+            self.__last_parse_result = self.load_pdf_from_url(new_hash, url, response)
+            if self.__last_parse_result:
+                self.__last_parse_error = "Lessons successful loaded from url"
+                # записываем созданные объекты в базу
+                save_pdf_to_db(self)
+
+        return self.__last_parse_result
+
+    def load_pdf_from_url(self, new_hash: str, url: str, response: requests.models.Response) -> bool:
         self.__hash = new_hash
         self.__lesson_dict = {}
         self.__created = None
@@ -650,12 +681,18 @@ class WeekSchedule:
         for key, value in self.__lesson_dict.items():
             if key.week == week and key.day_of_week == day_of_week:
                 result.append(value)
-        return result
+        result_sorted = sorted(result, key=lambda lesson: lesson.ident.hour_start)
+        return result_sorted
 
     @property
     def hash(self) -> str:
         """ Свойство хэш pdf """
         return self.__hash
+    
+    @hash.setter
+    def hash(self, value: str):
+        """ Setter свойства хэш pdf """
+        self.__hash = value
 
     @property
     def school_class(self):
@@ -663,17 +700,37 @@ class WeekSchedule:
         return self.__school_class
 
     @property
+    def created(self):
+        """ Свойство дата создания pdf """
+        return self.__created
+    
+    @created.setter
+    def created(self, value):
+        """ Setter свойства дата создания pdf """
+        self.__created = value
+
+    @property
     def last_parse_result(self) -> bool:
         """ Был ли разбор успешен """
         return self.__last_parse_result
 
+    @last_parse_result.setter
+    def last_parse_result(self, value: bool):
+        """ Setter Был ли разбор успешен """
+        self.__last_parse_result = value
+
     @property
     def last_parse_error(self) -> str:
         """ Ошибка разбора """
-        if self.__last_parse_error:
+        if self.__last_parse_error is None or self.__last_parse_error:
             return self.__last_parse_error
         else:
             return "Ошибка разбора pdf страницы"
+
+    @last_parse_error.setter
+    def last_parse_error(self, value: str):
+        """ Setter Ошибка разбора """
+        self.__last_parse_error = value
 
 def main():
     """
@@ -682,7 +739,7 @@ def main():
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     cfg.disable_logger(["pdfminer.psparser", "pdfminer.pdfparser", "pdfminer.pdfinterp", "pdfminer.cmapdb", "pdfminer.pdfdocument", "pdfminer.pdfpage"])
-    url = "https://1502.mskobr.ru//files/rasp/alpha/8Ж.pdf"
+    #url = "https://1502.mskobr.ru//files/rasp/alpha/8Ж.pdf"
     #url = "https://1502.mskobr.ru/files/rasp/alpha/7%D0%95.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/delta3/2%D0%BE.pdf"
     #url = "https://1502.mskobr.ru//files/rasp/beta/1А.pdf"
@@ -690,8 +747,9 @@ def main():
     #url = "https://1502.mskobr.ru//files/rasp/beta/2А.pdf"
     #url = 'https://1502.mskobr.ru//files/rasp/beta/2Б.pdf'
     #url = 'https://1502.mskobr.ru//files/rasp/gamma/7Л.pdf'
+    url = "https://1502.mskobr.ru//files/rasp/delta1/5%D1%8E.pdf"
     week_schedule = WeekSchedule()
-    week_schedule.parse(url)
+    week_schedule.parse(url, False)
     print("----------------------------------------------")
     for week in week_schedule.week_list():
         for day_of_week in week_schedule.day_of_week_list(week):
