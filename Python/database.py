@@ -281,17 +281,16 @@ def load_from_db(school, new_hash: str) -> bool:
             return False
     # Проверяем по new_hash
     logging.info(f"find in schedules hash = {new_hash}")
-    schedule_data_for_new = session.query(schedules) \
+    schedule_data = session.query(schedules) \
         .filter(schedules.c.hash == new_hash) \
         .filter(schedules.c.deleted is not None) \
         .first()
-    if schedule_data_for_new is None:
+    if schedule_data is None:
         return False
     if schedule_data_for_hash is not None:
         # Данные уже загружались
         return True
 
-    schedule_data = schedule_data_for_new
     school.schedule_name = schedule_data.name
 
     school_data = session.query(schools) \
@@ -376,7 +375,7 @@ def save_pdf_to_db(week_schedule) -> bool:
             )
         session.execute(stmt)
 
-        # Сохранение групп 
+        # Сохранение групп
         for lesson in lesson.groups:
             save_lesson(lesson, is_group = True)
 
@@ -388,7 +387,7 @@ def save_pdf_to_db(week_schedule) -> bool:
         last_parse_result = week_schedule.last_parse_result
     if session.query(week_schedules).filter_by(hash = week_schedule.hash).first() is not None:
         stmt = week_schedules.update().where(week_schedules.c.hash == week_schedule.hash).values(
-            schedule_hash = week_schedule.school_class.department.school.hash, 
+            schedule_hash = week_schedule.school_class.department.school.hash,
             class_id = week_schedule.school_class.id,
             created = week_schedule.created,
             parse_result = last_parse_result,
@@ -421,20 +420,24 @@ def load_pdf_from_db(week_schedule, new_hash: str) -> bool:
     Процедура загрузки pdf расписания из базы
     """
     from week_pdf_parser import LessonIdent, Lesson
+    schedule_data_for_hash = None
     if week_schedule.hash is not None and week_schedule.hash != '':
-        schedule_data = session.query(week_schedules) \
+        schedule_data_for_hash = session.query(week_schedules) \
             .filter(week_schedules.c.hash == week_schedule.hash) \
             .filter(week_schedules.c.parse_result == True) \
             .first()
-        if schedule_data is not None:
-            # Данные уже загружались
-            return True
+        if schedule_data_for_hash is None:
+            # Данные еще не загружались
+            return False
     schedule_data = session.query(week_schedules) \
         .filter(week_schedules.c.hash == new_hash) \
         .filter(week_schedules.c.parse_result == True) \
         .first()
     if schedule_data is None:
         return False
+    if schedule_data_for_hash is not None:
+        # Данные уже загружались
+        return True
 
     # Загрузка WeekSchedule
     week_schedule.created = schedule_data.created
