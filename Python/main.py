@@ -71,17 +71,17 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     create_context_data(context, user.id)
 
     await update.message.reply_text(
-        "\start - Начало работы бота\n\help - Список команд\n\about - Описание бота",
+        "/start - Начало работы бота\n/help - Список команд\n/about - Описание бота",
         reply_markup=reply_markup,
     )
     return START_ROUTES
 
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Отправить сообщение, когда выполнена команда /help.
+    Отправить сообщение, когда выполнена команда /about.
     """
     user: User = update.effective_user
-    logging.info(f"command help for {user.id}")
+    logging.info(f"command about for {user.id}")
     reply_markup: InlineKeyboardMarkup = keyboard_button_school(update, context)
     create_context_data(context, user.id)
 
@@ -363,11 +363,11 @@ def main() -> None:
     filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
+    application.add_handler(CommandHandler("help", help))
+    application.add_handler(CommandHandler("about", about))
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("start", start),
-            CommandHandler("help", help),
-            CommandHandler("about", about),
+            CommandHandler("start", start)
         ],
         states={
             START_ROUTES: [
