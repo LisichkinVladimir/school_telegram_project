@@ -4,6 +4,7 @@
 import datetime
 from hashlib import md5
 import logging
+import traceback
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
 from config import get_data_path
@@ -163,8 +164,10 @@ def delete_old_schedule(school_hash: str) -> None:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
         except:
-            # TODO логировать ошибки
-            pass
+            tb_list = traceback.format_exception()
+            tb_string = "".join(tb_list)
+            logging.error(f"Error info:{tb_string}")
+            save_error(0, tb_string, "", "", "")
 
 def save_to_db(school) -> None:
     """

@@ -61,6 +61,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return START_ROUTES
 
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Отправить сообщение, когда выполнена команда /help.
+    """
+    user: User = update.effective_user
+    logging.info(f"command help for {user.id}")
+    reply_markup: InlineKeyboardMarkup = keyboard_button_school(update, context)
+    create_context_data(context, user.id)
+
+    await update.message.reply_text(
+        "\start - Начало работы бота\n\help - Список команд\n\about - Описание бота",
+        reply_markup=reply_markup,
+    )
+    return START_ROUTES
+
+async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Отправить сообщение, когда выполнена команда /help.
+    """
+    user: User = update.effective_user
+    logging.info(f"command help for {user.id}")
+    reply_markup: InlineKeyboardMarkup = keyboard_button_school(update, context)
+    create_context_data(context, user.id)
+
+    await update.message.reply_text(
+        f"{messages.HELLO_MESSAGE}\nЗамечания и предложения по работе бота можно направлять на почту vladimir2.01.0.za@gmail.com",
+        reply_markup=reply_markup,
+    )
+    return START_ROUTES
+
 def keyboard_button_departments(menu_data: MenuData, context: ContextTypes.DEFAULT_TYPE) -> any:
     """
     Добавление кнопок корпусов
@@ -334,7 +364,11 @@ def main() -> None:
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("help", help),
+            CommandHandler("about", about),
+        ],
         states={
             START_ROUTES: [
                 CallbackQueryHandler(school_button, pattern="^SCHOOL"),
