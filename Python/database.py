@@ -164,7 +164,7 @@ def delete_old_schedule(school_hash: str) -> None:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
         except:
-            tb_list = traceback.format_exception()
+            tb_list = traceback.format_exception(None)
             tb_string = "".join(tb_list)
             logging.error(f"Error info:{tb_string}")
             save_error(0, tb_string, "", "", "")

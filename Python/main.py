@@ -61,7 +61,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return START_ROUTES
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Отправить сообщение, когда выполнена команда /help.
     """
@@ -363,7 +363,7 @@ def main() -> None:
     filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_message))
-    application.add_handler(CommandHandler("help", help))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("about", about))
     conv_handler = ConversationHandler(
         entry_points=[
