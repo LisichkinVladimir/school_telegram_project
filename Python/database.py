@@ -160,7 +160,7 @@ def delete_old_schedule(school_hash: str) -> None:
             # удалить week_schedules - расписания на неделю
             sql = "from week_schedules where schedule_hash = '" + schedule_hash + "'"
             schedule_data = connection.execute(db_sql.text("select * " + sql))
-            if schedule_data and len(week_schedules.all()) > 0:
+            if schedule_data and len(schedule_data.all()) > 0:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
         except:
