@@ -7,6 +7,7 @@ import logging
 import traceback
 import sqlalchemy as db_sql
 from sqlalchemy.orm import Session
+from sqlalchemy import exc
 from config import get_data_path
 
 # Место расположения Базы данных
@@ -139,6 +140,16 @@ errors = db_sql.Table(
 
 meta.create_all(engine)
 
+def log_error(e) -> None:
+    """
+    Логирование исключения в БД
+    """
+    tb_list = traceback.format_exception(None)
+    tb_string = "".join(tb_list)
+    logging.error(f"Error info:{tb_string}")
+    if "database is locked" not in str(e):
+        save_error(0, tb_string, "", "", "")
+
 def delete_old_schedule(school_hash: str) -> None:
     """"
     Удаление старых расписаний и уроков
@@ -163,107 +174,111 @@ def delete_old_schedule(school_hash: str) -> None:
             if schedule_data and len(schedule_data.all()) > 0:
                 connection.execute(db_sql.text("delete " + sql))
                 session.commit()
-        except:
-            tb_list = traceback.format_exception(None)
-            tb_string = "".join(tb_list)
-            logging.error(f"Error info:{tb_string}")
-            save_error(0, tb_string, "", "", "")
+        except exc.SQLAlchemyError as e:
+            if session.is_active:
+                session.rollback()
+            log_error(e)
 
 def save_to_db(school) -> None:
     """
     Процедура сохранения объекта школа в базе данных
     """
-    # Добавление/изменение школы
-    if session.query(schools).filter_by(id = school.id).first() is not None:
-        stmt = schools.update().where(schools.c.id == school.id).where(schools.c.name != school.name).values(name = school.name)
-    else:
-        stmt = schools.insert().values(
-            id = school.id,
-            name = school.name
-        )
-    session.execute(stmt)
-
-    department_list = []
-    # Добавление/изменение подразделений школы
-    for i, department in enumerate(school.departments):
-        department_list.append(department.id)
-        if session.query(departments).filter_by(id = department.id).first() is not None:
-            stmt = departments.update() \
-                .where(departments.c.id == department.id) \
-                .values(
-                    name = department.name,
-                    school_id = school.id,
-                    sequence = i,
-                    deleted = None
-                )
+    try:
+        # Добавление/изменение школы
+        if session.query(schools).filter_by(id = school.id).first() is not None:
+            stmt = schools.update().where(schools.c.id == school.id).where(schools.c.name != school.name).values(name = school.name)
         else:
-            stmt = departments.insert().values(
-                id = department.id,
-                name = department.name,
-                sequence = i,
-                school_id = school.id
+            stmt = schools.insert().values(
+                id = school.id,
+                name = school.name
             )
         session.execute(stmt)
-        # Добавление/изменение классов подразделений школы
-        for j, class_ in enumerate(department.class_list):
-            if session.query(classes).filter_by(id = class_.id).first() is not None:
-                stmt = classes.update() \
-                    .where(classes.c.id == class_.id).values(
-                        name = class_.name,
-                        department_id = department.id,
-                        number = class_.number,
-                        link = class_.link,
-                        sequence = j,
+
+        department_list = []
+        # Добавление/изменение подразделений школы
+        for i, department in enumerate(school.departments):
+            department_list.append(department.id)
+            if session.query(departments).filter_by(id = department.id).first() is not None:
+                stmt = departments.update() \
+                    .where(departments.c.id == department.id) \
+                    .values(
+                        name = department.name,
+                        school_id = school.id,
+                        sequence = i,
                         deleted = None
                     )
             else:
-                stmt = classes.insert().values(
-                    id = class_.id,
-                    name = class_.name,
-                    department_id = department.id,
-                    number = class_.number,
-                    sequence = j,
-                    link = class_.link
+                stmt = departments.insert().values(
+                    id = department.id,
+                    name = department.name,
+                    sequence = i,
+                    school_id = school.id
                 )
             session.execute(stmt)
+            # Добавление/изменение классов подразделений школы
+            for j, class_ in enumerate(department.class_list):
+                if session.query(classes).filter_by(id = class_.id).first() is not None:
+                    stmt = classes.update() \
+                        .where(classes.c.id == class_.id).values(
+                            name = class_.name,
+                            department_id = department.id,
+                            number = class_.number,
+                            link = class_.link,
+                            sequence = j,
+                            deleted = None
+                        )
+                else:
+                    stmt = classes.insert().values(
+                        id = class_.id,
+                        name = class_.name,
+                        department_id = department.id,
+                        number = class_.number,
+                        sequence = j,
+                        link = class_.link
+                    )
+                session.execute(stmt)
 
-    # Удалим лишние подразделения
-    stmt = departments.update() \
-        .where(departments.c.school_id != school.id)  \
-        .where(departments.c.id.in_(department_list)) \
-        .where(departments.c.deleted == None) \
-        .values(
-            deleted = datetime.datetime.now()
-    )
-    session.execute(stmt)
-
-    # Добавление/изменение расписания школы
-    if session.query(schedules).filter_by(hash = school.hash).first() is not None:
-        stmt = schedules.update() \
-            .where(schedules.c.hash == school.hash) \
+        # Удалим лишние подразделения
+        stmt = departments.update() \
+            .where(departments.c.school_id != school.id)  \
+            .where(departments.c.id.in_(department_list)) \
+            .where(departments.c.deleted == None) \
             .values(
+                deleted = datetime.datetime.now()
+        )
+        session.execute(stmt)
+
+        # Добавление/изменение расписания школы
+        if session.query(schedules).filter_by(hash = school.hash).first() is not None:
+            stmt = schedules.update() \
+                .where(schedules.c.hash == school.hash) \
+                .values(
+                    name = school.schedule_name,
+                    school_id = school.id
+
+                )
+        else:
+            stmt = schedules.insert().values(
+                hash = school.hash,
                 name = school.schedule_name,
                 school_id = school.id
-
             )
-    else:
-        stmt = schedules.insert().values(
-            hash = school.hash,
-            name = school.schedule_name,
-            school_id = school.id
-        )
-    session.execute(stmt)
+        session.execute(stmt)
 
-    # Удалим лишние расписания
-    stmt = schedules.update() \
-        .where(schedules.c.hash != school.hash)  \
-        .where(schedules.c.school_id == school.id) \
-        .where(schedules.c.deleted == None) \
-        .values(
-            deleted = datetime.datetime.now()
-    )
-    session.execute(stmt)
-    session.commit()
+        # Удалим лишние расписания
+        stmt = schedules.update() \
+            .where(schedules.c.hash != school.hash)  \
+            .where(schedules.c.school_id == school.id) \
+            .where(schedules.c.deleted == None) \
+            .values(
+                deleted = datetime.datetime.now()
+        )
+        session.execute(stmt)
+        session.commit()
+    except exc.SQLAlchemyError as e:
+        if session.is_active:
+            session.rollback(e)
+        log_error(e)
 
     # Удалим лишнее в lessons_ident/lessons/week_schedules
     delete_old_schedule(school.hash)
@@ -384,35 +399,42 @@ def save_pdf_to_db(week_schedule) -> bool:
 
     if week_schedule.school_class is None:
         return False
-    # Добавление/изменение недельного расписания
-    last_parse_result = None
-    if week_schedule.last_parse_error:
-        last_parse_result = week_schedule.last_parse_result
-    if session.query(week_schedules).filter_by(hash = week_schedule.hash).first() is not None:
-        stmt = week_schedules.update().where(week_schedules.c.hash == week_schedule.hash).values(
-            schedule_hash = week_schedule.school_class.department.school.hash,
-            class_id = week_schedule.school_class.id,
-            created = week_schedule.created,
-            parse_result = last_parse_result,
-            parse_error = week_schedule.last_parse_error)
-    else:
-        stmt = week_schedules.insert().values(
-            hash = week_schedule.hash,
-            schedule_hash = week_schedule.school_class.department.school.hash,
-            class_id = week_schedule.school_class.id,
-            created = week_schedule.created,
-            parse_result = last_parse_result,
-            parse_error = week_schedule.last_parse_error
-        )
-    session.execute(stmt)
+    try:
+        # Добавление/изменение недельного расписания
+        last_parse_result = None
+        if week_schedule.last_parse_error:
+            last_parse_result = week_schedule.last_parse_result
+        if session.query(week_schedules).filter_by(hash = week_schedule.hash).first() is not None:
+            stmt = week_schedules.update().where(week_schedules.c.hash == week_schedule.hash).values(
+                schedule_hash = week_schedule.school_class.department.school.hash,
+                class_id = week_schedule.school_class.id,
+                created = week_schedule.created,
+                parse_result = last_parse_result,
+                parse_error = week_schedule.last_parse_error)
+        else:
+            stmt = week_schedules.insert().values(
+                hash = week_schedule.hash,
+                schedule_hash = week_schedule.school_class.department.school.hash,
+                class_id = week_schedule.school_class.id,
+                created = week_schedule.created,
+                parse_result = last_parse_result,
+                parse_error = week_schedule.last_parse_error
+            )
+        # Здесь была зафиксирована блокировка
+        logging.info(f"Update week_schedules {str(stmt)}")
+        session.execute(stmt)
 
-    # Записать данные в таблицу lessons/lessons_ident
-    for week in week_schedule.week_list():
-        for day_of_week in week_schedule.day_of_week_list(week):
-            for lesson in week_schedule.lesson_list(week, day_of_week):
-                save_lesson(lesson)
+        # Записать данные в таблицу lessons/lessons_ident
+        for week in week_schedule.week_list():
+            for day_of_week in week_schedule.day_of_week_list(week):
+                for lesson in week_schedule.lesson_list(week, day_of_week):
+                    save_lesson(lesson)
 
-    session.commit()
+        session.commit()
+    except exc.SQLAlchemyError as e:
+        if session.is_active:
+            session.rollback()
+        log_error(e)
 
     # Удалим лишнее в lessons_ident/lessons/week_schedules
     delete_old_schedule(week_schedule.school_class.department.school.hash)
@@ -479,23 +501,28 @@ def save_user_class(user_id: int, class_id: int, user_name: str) -> None:
     Сохранение данных о последнем запрошенном пользователем классе
     """
     users_data = session.query(users).filter(users.c.id == user_id).first()
-    if users_data is not None:
-        stmt = users.update() \
-            .where(users.c.id == user_id) \
-            .values(
+    try:
+        if users_data is not None:
+            stmt = users.update() \
+                .where(users.c.id == user_id) \
+                .values(
+                    class_id = class_id,
+                    name = user_name,
+                    updated = datetime.datetime.now()
+                )
+        else:
+            stmt = users.insert().values(
+                id = user_id,
                 class_id = class_id,
                 name = user_name,
                 updated = datetime.datetime.now()
             )
-    else:
-        stmt = users.insert().values(
-            id = user_id,
-            class_id = class_id,
-            name = user_name,
-            updated = datetime.datetime.now()
-        )
-    session.execute(stmt)
-    session.commit()
+        session.execute(stmt)
+        session.commit()
+    except exc.SQLAlchemyError as e:
+        if session.is_active:
+            session.rollback()
+        log_error(e)
 
 def get_user_class(user_id) -> int:
     """"
@@ -542,5 +569,9 @@ def save_error(user_id: int, traceback: str, update: str, context_chat: str, con
             trace_hash = trace_hash,
             error_count = 1
         )
-    session.execute(stmt)
-    session.commit()
+    try:
+        session.execute(stmt)
+        session.commit()
+    except exc.SQLAlchemyError:
+        if session.is_active:
+            session.rollback()
